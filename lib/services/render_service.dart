@@ -5,11 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/vitals_model.dart';
+import 'api_service.dart';
 
 export '../models/vitals_model.dart';
 
-/// Cloud fetcher service — fetches the latest triage result for a patient
-/// from the Render cloud backend using GET /patients.
+/// Cloud & local fetcher service — fetches the latest triage result for a patient
+/// from the backend (Render or Local Pi) using GET /patients.
 class RenderService {
   /// Active production backend (matches ApiService._productionUrl).
   static const String defaultCloudUrl = 'https://raksha-api-7ie6.onrender.com';
@@ -19,9 +20,10 @@ class RenderService {
   final http.Client _client;
 
   RenderService({
-    this.cloudUrl = defaultCloudUrl,
+    String? cloudUrl,
     http.Client? client,
-  }) : _client = client ?? http.Client();
+  })  : cloudUrl = cloudUrl ?? ApiService.baseUrl,
+        _client = client ?? http.Client();
 
   /// Fetches the latest triage payload from GET /patients and returns the
   /// most recent triage row for the given [patientId] as a [VitalsModel].
@@ -86,16 +88,23 @@ class RenderService {
           }
         }
 
+        // Ensure we have a triage entry; if missing, provide default pending status
         if (latestTriage == null) {
           debugPrint(
             '⚠️ [RenderService] No triage result found for patient: $patientId',
           );
-          return null;
+          latestTriage = {'triage': 'pending', 'confidence': 0.0};
         }
-
-        // Merge vitals + triage into a flat map for VitalsModel.fromJson
+        // Ensure vitals data exists; if missing, use empty map so defaults apply
+        if (latestVitals == null) {
+          debugPrint(
+            '⚠️ [RenderService] No vitals data found for patient: $patientId',
+          );
+          latestVitals = {};
+        }
+        // Merge vitals and triage maps (triage overrides if overlapping keys)
         final merged = <String, dynamic>{
-          ...?latestVitals,
+          ...latestVitals,
           ...latestTriage,
         };
 

@@ -156,22 +156,43 @@ class VitalsModel {
     this.status = '',
   });
 
+// Updated factory to parse flat backend JSON while preserving nested helper classes.
   factory VitalsModel.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const VitalsModel();
+    // Flat fields from backend
+    final ecg = EcgData(
+      heartRateBpm: (json['ecg_hr'] as num?)?.toInt() ?? 0,
+      samples: const [], // no waveform data from backend
+    );
+    final List<dynamic>? rawRgbList = json['urine_rgb'] is List ? json['urine_rgb'] as List : null;
+    final urine = UrineSensorData(
+      red: (json['urine_r'] as num?)?.toInt() ??
+          (rawRgbList != null && rawRgbList.isNotEmpty ? (rawRgbList[0] as num).toInt() : 0),
+      green: (json['urine_g'] as num?)?.toInt() ??
+          (rawRgbList != null && rawRgbList.length > 1 ? (rawRgbList[1] as num).toInt() : 0),
+      blue: (json['urine_b'] as num?)?.toInt() ??
+          (rawRgbList != null && rawRgbList.length > 2 ? (rawRgbList[2] as num).toInt() : 0),
+    );
+    // Stethoscope data not provided by backend; keep defaults.
+    final steth = const StethoscopeData();
+    final temperature = TemperatureData(
+      bodyTempC: (json['temperature'] as num?)?.toDouble() ?? 0.0,
+    );
+    final pulseOximeter = PulseOximeterData(
+      heartRateBpm: (json['ecg_hr'] as num?)?.toInt() ?? 0,
+      spo2Percent: (json['spo2'] as num?)?.toInt() ?? 0,
+      irRaw: 0,
+    );
     return VitalsModel(
       patientId: json['patient_id']?.toString() ?? '',
       deviceId: json['device_id']?.toString() ?? 'RASPI-001',
       timestamp: json['timestamp']?.toString() ?? '',
       patientSpeechText: json['patient_speech_text']?.toString() ?? '',
-      ecg: EcgData.fromJson(json['ecg'] as Map<String, dynamic>?),
-      urineSensor:
-          UrineSensorData.fromJson(json['urine_sensor'] as Map<String, dynamic>?),
-      stethoscope:
-          StethoscopeData.fromJson(json['stethoscope'] as Map<String, dynamic>?),
-      temperature:
-          TemperatureData.fromJson(json['temperature'] as Map<String, dynamic>?),
-      pulseOximeter: PulseOximeterData.fromJson(
-          json['pulse_oximeter'] as Map<String, dynamic>?),
+      ecg: ecg,
+      urineSensor: urine,
+      stethoscope: steth,
+      temperature: temperature,
+      pulseOximeter: pulseOximeter,
       status: json['status']?.toString() ?? '',
     );
   }

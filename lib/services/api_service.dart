@@ -10,7 +10,7 @@ import 'vitals_model.dart';
 
 /// API Service for Render backend hardware telemetry endpoint
 class RenderApiService {
-  static const String baseUrl = 'https://raksha-api-7ie6.onrender.com';
+  static String get baseUrl => ApiService.baseUrl;
   static const Duration requestTimeout = Duration(seconds: 35);
 
   /// Fetches hardware vitals telemetry data from Render cloud backend.
