@@ -151,13 +151,25 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
     final triageProvider = Provider.of<TriageProvider>(context, listen: false);
     switch (widget.testType) {
       case VitalTestType.spo2:
-      case VitalTestType.temp:
-        final int spo2Val = (data?['spo2'] as num?)?.toInt() ?? 98;
-        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
-        final double tempVal = (data?['temperature'] as num?)?.toDouble() ?? 36.8;
+        final int spo2Val = (data?['spo2'] as num?)?.toInt() ?? 
+            (triageProvider.spo2TempResult?.spo2 ?? 98);
+        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 
+            (triageProvider.spo2TempResult?.heartRate.toDouble() ?? 74.0);
+        final double existingTemp = triageProvider.spo2TempResult?.temperature ?? 36.8;
         triageProvider.applySpo2TempData(
           spo2: spo2Val,
           heartRate: hrVal.toInt(),
+          temperature: existingTemp,
+        );
+        break;
+      case VitalTestType.temp:
+        final double tempVal = (data?['temperature'] as num?)?.toDouble() ?? 
+            (triageProvider.spo2TempResult?.temperature ?? 36.8);
+        final int existingSpo2 = triageProvider.spo2TempResult?.spo2 ?? 98;
+        final int existingHr = triageProvider.spo2TempResult?.heartRate ?? 72;
+        triageProvider.applySpo2TempData(
+          spo2: existingSpo2,
+          heartRate: existingHr,
           temperature: tempVal,
         );
         break;
@@ -172,16 +184,24 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
         break;
       case VitalTestType.urine:
         final String color = data?['color']?.toString() ?? 'Yellow';
+        List<double>? parsedRgb;
+        if (data?['urine_rgb'] is List) {
+          parsedRgb = (data!['urine_rgb'] as List)
+              .map((e) => (e as num?)?.toDouble() ?? 0.0)
+              .toList();
+        }
         triageProvider.applyUrineData(
           color: color,
           ph: 6.5,
           protein: 'Negative',
           glucose: 'Negative',
+          rawRgb: parsedRgb,
         );
         break;
       case VitalTestType.stethoscope:
       case VitalTestType.voice:
-        final String lung = data?['lung_sound']?.toString() ?? 'Clear';
+        final String lung = data?['lung_sound']?.toString() ?? 
+            (data?['stethoscope_status'] == 'recorded' ? 'Recorded' : 'Clear');
         final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
         triageProvider.applyStethData(
           heartRate: hrVal,
