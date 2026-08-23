@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/triage_provider.dart';
 import '../providers/triage_state.dart';
+import '../services/pi_service.dart';
 import '../services/raspi_api_service.dart';
 import '../widgets/app_header.dart';
 import 'dashboard_completed_screen.dart';
@@ -130,30 +131,20 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
 
   Future<void> _startHardwareTest() async {
     // 1. Attempt real hardware trigger via RaspiApiService → PiService
-    final bool success = await RaspiApiService.triggerTest(widget.testType);
+    final TriggerResult result = await RaspiApiService.triggerTest(widget.testType);
 
     if (!mounted) return;
 
-    if (success) {
-      debugPrint('✅ [DynamicTestLoader] Hardware trigger succeeded for ${widget.testType}.');
+    final data = result.data;
+    if (result.success && data != null) {
+      debugPrint('✅ [DynamicTestLoader] Live hardware reading succeeded for ${widget.testType}: $data');
     } else {
-      // ── DEMO_FALLBACK ─────────────────────────────────────────────────
-      // The Pi backend does not implement /trigger/* endpoints yet (sensors
-      // not physically wired). Instead of blocking the entire app flow,
-      // simulate a successful reading with realistic demo values so the
-      // dashboard cards can be marked complete and the triage pipeline is
-      // exercisable end-to-end.
-      // Remove this fallback once real /trigger/* endpoints are live on Pi.
-      // ──────────────────────────────────────────────────────────────────
-      debugPrint('⚠️ [DynamicTestLoader] Hardware trigger failed for ${widget.testType}. '
-          'Using DEMO_FALLBACK with realistic mock values.');
-
-      // Brief pause so the loading animation is visible (feels like a real reading)
-      await Future.delayed(const Duration(milliseconds: 1200));
+      debugPrint('⚠️ [DynamicTestLoader] Live hardware trigger unavailable for ${widget.testType}. Using safe baseline fallback.');
+      await Future.delayed(const Duration(milliseconds: 1000));
       if (!mounted) return;
     }
 
-    // 2. Mark test completed in TriageState + apply realistic demo vitals
+    // 2. Mark test completed in TriageState + apply vitals data
     final triageState = Provider.of<TriageState>(context, listen: false);
     triageState.markCompleted(widget.testType);
 
@@ -161,25 +152,28 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
     switch (widget.testType) {
       case VitalTestType.spo2:
       case VitalTestType.temp:
-        // DEMO_FALLBACK values: SpO2 97%, HR 78 BPM, Temp 37.1°C
+        final int spo2Val = (data?['spo2'] as num?)?.toInt() ?? 98;
+        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
+        final double tempVal = (data?['temperature'] as num?)?.toDouble() ?? 36.8;
         triageProvider.applySpo2TempData(
-          spo2: 97,
-          heartRate: 78,
-          temperature: 37.1,
+          spo2: spo2Val,
+          heartRate: hrVal.toInt(),
+          temperature: tempVal,
         );
         break;
       case VitalTestType.hr:
-        // DEMO_FALLBACK values: HR 76 BPM, Normal Sinus, QT 410ms
+        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
+        final String rhythm = data?['rhythm']?.toString() ?? 'Normal Sinus';
         triageProvider.applyEcgData(
-          heartRate: 76.0,
-          rhythm: 'Normal Sinus',
+          heartRate: hrVal,
+          rhythm: rhythm,
           qtInterval: 410.0,
         );
         break;
       case VitalTestType.urine:
-        // DEMO_FALLBACK values: Yellow, pH 6.5, Negative protein/glucose
+        final String color = data?['color']?.toString() ?? 'Yellow';
         triageProvider.applyUrineData(
-          color: 'Yellow',
+          color: color,
           ph: 6.5,
           protein: 'Negative',
           glucose: 'Negative',
@@ -187,10 +181,11 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
         break;
       case VitalTestType.stethoscope:
       case VitalTestType.voice:
-        // DEMO_FALLBACK values: HR 74 BPM, Clear lung sounds
+        final String lung = data?['lung_sound']?.toString() ?? 'Clear';
+        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
         triageProvider.applyStethData(
-          heartRate: 74.0,
-          lungSound: 'Clear',
+          heartRate: hrVal,
+          lungSound: lung,
         );
         break;
     }

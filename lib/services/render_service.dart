@@ -41,12 +41,28 @@ class RenderService {
       final uri = Uri.parse(endpoint);
       debugPrint('🚀 [RenderService] Requesting patients list -> $uri');
 
-      final response = await _client.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-        },
-      ).timeout(requestTimeout);
+      http.Response response;
+      try {
+        response = await _client.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+          },
+        ).timeout(requestTimeout);
+      } catch (firstErr) {
+        if (!cloudUrl.contains('127.0.0.1') && !cloudUrl.contains('localhost')) {
+          final fallbackUri = Uri.parse('http://127.0.0.1:8000/patients');
+          debugPrint('⚠️ [RenderService] Primary $uri unreachable ($firstErr). Attempting localhost: $fallbackUri');
+          response = await _client.get(
+            fallbackUri,
+            headers: {
+              'Accept': 'application/json',
+            },
+          ).timeout(requestTimeout);
+        } else {
+          rethrow;
+        }
+      }
 
       debugPrint(
         '📥 [RenderService] Response Status: ${response.statusCode}',

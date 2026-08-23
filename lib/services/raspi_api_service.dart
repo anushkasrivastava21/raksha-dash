@@ -13,9 +13,9 @@ class RaspiApiService {
   static Future<bool> initSession({String? patientId}) async {
     debugPrint('🔌 [RaspiApiService] Initializing hardware session (RasPi + ESP)...');
     try {
-      final success = await _piService.initSession(patientId: patientId);
-      debugPrint('🔌 [RaspiApiService] Session init result: $success');
-      return success;
+      final res = await _piService.initSession(patientId: patientId);
+      debugPrint('🔌 [RaspiApiService] Session init result: ${res.success}');
+      return res.success;
     } catch (e) {
       debugPrint('❌ [RaspiApiService] Error during initSession: $e');
       return false;
@@ -23,7 +23,7 @@ class RaspiApiService {
   }
 
   /// Triggers a specific test's hardware handshake on the Raspberry Pi / ESP.
-  static Future<bool> triggerTest(VitalTestType type) async {
+  static Future<TriggerResult> triggerTest(VitalTestType type) async {
     debugPrint('🚀 [RaspiApiService] Triggering hardware test for: $type');
     try {
       switch (type) {
@@ -42,7 +42,7 @@ class RaspiApiService {
       }
     } catch (e) {
       debugPrint('❌ [RaspiApiService] Error triggering test $type: $e');
-      return false;
+      return const TriggerResult(success: false);
     }
   }
 
