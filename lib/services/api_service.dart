@@ -64,6 +64,19 @@ class RenderApiService {
   }
 }
 
+/// Result object for cloud save operations
+class SaveToCloudResult {
+  final bool success;
+  final String message;
+  final int? statusCode;
+
+  const SaveToCloudResult({
+    required this.success,
+    required this.message,
+    this.statusCode,
+  });
+}
+
 /// ApiService with smart environment resolution, automatic CORS fallback,
 /// pre-flight JSON audit, typed exception logging, and offline fail-safe caching.
 class ApiService {
@@ -72,8 +85,9 @@ class ApiService {
   // Set to true  = LOCAL MODE       → traffic routed to http://172.16.46.141:8000 (Raspberry Pi LAN)
   static const bool useLocalServer = true;
 
-  // ── PRODUCTION URLS (no trailing slash — prevents double-slash on endpoint append)
-  static const String _productionUrl = 'https://raksha-api-7ie6.onrender.com';
+  // ── PRODUCTION CLOUD BACKEND URL (no trailing slash)
+  static const String cloudBackendUrl = 'https://raksha-api-71a6.onrender.com';
+  static const String _productionUrl = cloudBackendUrl;
   static const String mlEngineUrl = 'https://raksha-sim.onrender.com';
 
   // Request timeout — 35s accounts for Render free-tier cold starts
@@ -89,6 +103,96 @@ class ApiService {
   /// Local Base URL resolver — returns Pi local IP on all platforms (Android, iOS, desktop, web)
   static String get _localUrl {
     return 'http://172.16.46.141:8000';
+  }
+
+  /// Dedicated method to save vitals & triage data DIRECTLY to Cloud Backend
+  /// (https://raksha-api-71a6.onrender.com), regardless of useLocalServer mode.
+  static Future<SaveToCloudResult> saveToCloud(Map<String, dynamic> payload) async {
+    debugPrint("════════════════════════════════════════════════════");
+    debugPrint("☁️ [SAVE_TO_CLOUD] Dispatching patient payload to: $cloudBackendUrl");
+
+    // 1. Prepare and validate Vitals payload
+    Map<String, dynamic> vitalsPayload;
+    String vitalsJson = "";
+
+    try {
+      vitalsPayload = payload.containsKey("vitals") && payload["vitals"] is Map
+          ? Map<String, dynamic>.from(payload["vitals"])
+          : payload;
+      vitalsJson = jsonEncode(vitalsPayload);
+    } catch (e) {
+      debugPrint("❌ [SAVE_TO_CLOUD] Serialization error: $e");
+      return SaveToCloudResult(
+        success: false,
+        message: "Failed to encode patient data: $e",
+      );
+    }
+
+    // 2. POST /vitals to Cloud Backend
+    try {
+      final Uri vitalsUri = Uri.parse('$cloudBackendUrl/vitals');
+      debugPrint("🚀 [SAVE_TO_CLOUD] POST -> $vitalsUri");
+      debugPrint("📦 Vitals Payload: $vitalsJson");
+
+      final vitalsResponse = await _safePost(vitalsUri, vitalsJson);
+      debugPrint("📥 [SAVE_TO_CLOUD] /vitals HTTP ${vitalsResponse.statusCode}: ${vitalsResponse.body}");
+
+      if (vitalsResponse.statusCode != 200 && vitalsResponse.statusCode != 201) {
+        return SaveToCloudResult(
+          success: false,
+          statusCode: vitalsResponse.statusCode,
+          message: "Server rejected vitals with HTTP ${vitalsResponse.statusCode}: ${vitalsResponse.body}",
+        );
+      }
+
+      // 3. POST /triage to Cloud Backend (if triage payload is present)
+      if (payload.containsKey("triage") && payload["triage"] is Map) {
+        try {
+          final triagePayload = Map<String, dynamic>.from(payload["triage"]);
+          final triageJson = jsonEncode(triagePayload);
+          final Uri triageUri = Uri.parse('$cloudBackendUrl/triage');
+          debugPrint("🚀 [SAVE_TO_CLOUD] POST -> $triageUri");
+          debugPrint("📦 Triage Payload: $triageJson");
+
+          final triageResponse = await _safePost(triageUri, triageJson);
+          debugPrint("📥 [SAVE_TO_CLOUD] /triage HTTP ${triageResponse.statusCode}: ${triageResponse.body}");
+        } catch (triageErr) {
+          debugPrint("⚠️ [SAVE_TO_CLOUD] /triage warning: $triageErr");
+        }
+      }
+
+      debugPrint("🎉 [SAVE_TO_CLOUD] Patient successfully persisted to Cloud Backend.");
+      debugPrint("════════════════════════════════════════════════════");
+      return const SaveToCloudResult(
+        success: true,
+        statusCode: 200,
+        message: "Successfully Saved",
+      );
+    } on TimeoutException {
+      debugPrint("⏰ [SAVE_TO_CLOUD] Request timed out.");
+      return const SaveToCloudResult(
+        success: false,
+        message: "Cloud server timed out (server may be waking up from sleep). Please retry.",
+      );
+    } on SocketException catch (e) {
+      debugPrint("🔌 [SAVE_TO_CLOUD] SocketException: $e");
+      return SaveToCloudResult(
+        success: false,
+        message: "Network error reaching Cloud backend: ${e.message}",
+      );
+    } on FormatException catch (e) {
+      debugPrint("📄 [SAVE_TO_CLOUD] FormatException: $e");
+      return SaveToCloudResult(
+        success: false,
+        message: "Invalid response from Cloud server: ${e.message}",
+      );
+    } catch (e) {
+      debugPrint("❌ [SAVE_TO_CLOUD] Unexpected error: $e");
+      return SaveToCloudResult(
+        success: false,
+        message: "Error saving to cloud: $e",
+      );
+    }
   }
 
   /// Caches failed sync payloads to shared preferences for safe offline recovery.

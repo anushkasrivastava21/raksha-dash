@@ -386,6 +386,25 @@ class TriageProvider extends ChangeNotifier {
     return await ApiService.pushTriageData(payload);
   }
 
+  /// Dedicated method to save current session data directly to Cloud Backend
+  /// (https://raksha-api-71a6.onrender.com).
+  Future<SaveToCloudResult> saveToCloud() async {
+    if (_patientInfo.id.isEmpty || _patientInfo.id == 'PT-0000' || _patientInfo.id == 'PT-0001') {
+      final String freshId = 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+      _patientInfo = PatientInfo(
+        id: freshId,
+        name: _patientInfo.name,
+        age: _patientInfo.age,
+        gender: _patientInfo.gender,
+        phone: _patientInfo.phone,
+        village: _patientInfo.village,
+      );
+    }
+
+    final payload = generateJsonPayload();
+    return await ApiService.saveToCloud(payload);
+  }
+
   void goToNextStep() {
     if (_currentPage < totalPages - 1) {
       _currentPage++;

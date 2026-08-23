@@ -13,7 +13,7 @@ export '../models/vitals_model.dart';
 /// from the backend (Render or Local Pi) using GET /patients.
 class RenderService {
   /// Active production backend (matches ApiService._productionUrl).
-  static const String defaultCloudUrl = 'https://raksha-api-7ie6.onrender.com';
+  static const String defaultCloudUrl = 'https://raksha-api-71a6.onrender.com';
   static const Duration requestTimeout = Duration(seconds: 35);
 
   final String cloudUrl;
