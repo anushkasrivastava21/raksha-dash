@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform, SocketException, HttpException;
+import 'dart:io' show SocketException, HttpException;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -69,8 +69,8 @@ class RenderApiService {
 class ApiService {
   // ── ENVIRONMENT CONFIGURATION ──────────────────────────────────────────────
   // Set to false = PRODUCTION MODE → all traffic routed to Render cloud
-  // Set to true  = LOCAL MODE       → traffic routed to 127.0.0.1:8000
-  static const bool useLocalServer = false;
+  // Set to true  = LOCAL MODE       → traffic routed to http://172.16.46.141:8000 (Raspberry Pi LAN)
+  static const bool useLocalServer = true;
 
   // ── PRODUCTION URLS (no trailing slash — prevents double-slash on endpoint append)
   static const String _productionUrl = 'https://raksha-api-7ie6.onrender.com';
@@ -81,21 +81,14 @@ class ApiService {
 
   /// Primary Base URL — resolves to production or local depending on flag
   static String get baseUrl {
-    if (!useLocalServer) return _productionUrl;
-    return _localUrl;
+    final resolved = !useLocalServer ? _productionUrl : _localUrl;
+    debugPrint('🌐 [ApiService] Resolved Base URL: $resolved (useLocalServer: $useLocalServer)');
+    return resolved;
   }
 
-  /// Local Base URL resolver
+  /// Local Base URL resolver — returns Pi local IP on all platforms (Android, iOS, desktop, web)
   static String get _localUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000'; // Android Emulator host alias
-      }
-    } catch (_) {}
-    return 'http://127.0.0.1:8000';
+    return 'http://172.16.46.141:8000';
   }
 
   /// Caches failed sync payloads to shared preferences for safe offline recovery.
