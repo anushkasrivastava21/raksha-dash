@@ -132,8 +132,8 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                                           isCompleted: triageState.isCompleted(VitalTestType.hr),
                                           icon: triageState.isCompleted(VitalTestType.hr)
                                               ? Icons.check_circle
-                                              : Icons.monitor_heart,
-                                          title: 'HR',
+                                              : Icons.monitor_heart_outlined,
+                                          title: 'ECG',
                                           subtitle: 'Tap to retake Test',
                                           onTap: () => _navigateToTest(context, VitalTestType.hr),
                                         ),

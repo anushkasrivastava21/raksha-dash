@@ -115,15 +115,15 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Expanded(
-                                        child: _buildCard(
-                                          isCompleted: triageState.isCompleted(VitalTestType.hr),
-                                          icon: Icons.monitor_heart,
-                                          title: 'HR',
-                                          sensor: 'SENSOR: MAX30102',
-                                          onTap: () => _navigateToTest(context, VitalTestType.hr),
+                                        Expanded(
+                                          child: _buildCard(
+                                            isCompleted: triageState.isCompleted(VitalTestType.hr),
+                                            icon: Icons.monitor_heart_outlined,
+                                            title: 'ECG',
+                                            sensor: 'SENSOR: MAX30102',
+                                            onTap: () => _navigateToTest(context, VitalTestType.hr),
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),

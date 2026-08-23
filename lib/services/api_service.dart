@@ -170,27 +170,17 @@ class ApiService {
       );
     } on TimeoutException {
       debugPrint("⏰ [SAVE_TO_CLOUD] Request timed out.");
+      await cacheFailedPayload(payload);
       return const SaveToCloudResult(
-        success: false,
-        message: "Cloud server timed out (server may be waking up from sleep). Please retry.",
-      );
-    } on SocketException catch (e) {
-      debugPrint("🔌 [SAVE_TO_CLOUD] SocketException: $e");
-      return SaveToCloudResult(
-        success: false,
-        message: "Network error reaching Cloud backend: ${e.message}",
-      );
-    } on FormatException catch (e) {
-      debugPrint("📄 [SAVE_TO_CLOUD] FormatException: $e");
-      return SaveToCloudResult(
-        success: false,
-        message: "Invalid response from Cloud server: ${e.message}",
+        success: true,
+        message: "Saved Locally (Cloud Unreachable)",
       );
     } catch (e) {
-      debugPrint("❌ [SAVE_TO_CLOUD] Unexpected error: $e");
-      return SaveToCloudResult(
-        success: false,
-        message: "Error saving to cloud: $e",
+      debugPrint("❌ [SAVE_TO_CLOUD] Network/Unexpected error: $e");
+      await cacheFailedPayload(payload);
+      return const SaveToCloudResult(
+        success: true,
+        message: "Saved Locally (Offline Mode)",
       );
     }
   }
@@ -224,16 +214,34 @@ class ApiService {
 
   /// Internal helper to post to an endpoint with timeout and headers
   static Future<http.Response> _safePost(Uri uri, String body) async {
-    return await http
-        .post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: body,
-        )
-        .timeout(requestTimeout);
+    try {
+      return await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 8)); // Shorter timeout for faster fallback
+    } catch (firstErr) {
+      if (uri.host.contains('onrender.com') || uri.host.contains('172.16.46.141')) {
+        final fallbackUri = Uri.parse('http://127.0.0.1:8000${uri.path}');
+        debugPrint('⚠️ [ApiService] Primary POST $uri failed ($firstErr). Trying localhost fallback: $fallbackUri');
+        return await http
+            .post(
+              fallbackUri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: body,
+            )
+            .timeout(requestTimeout);
+      }
+      rethrow;
+    }
   }
 
   /// Pushes Vitals telemetry payload to backend (POST /vitals).

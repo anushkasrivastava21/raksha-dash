@@ -81,23 +81,25 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
 
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle_outline, color: Colors.white),
-                SizedBox(width: 10),
-                Text(
-                  'Successfully Saved',
-                  style: TextStyle(
-                    fontFamily: 'Space Mono',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                const Icon(Icons.check_circle_outline, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(
+                      fontFamily: 'Space Mono',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],
             ),
-            backgroundColor: Color(0xFF22C55E),
-            duration: Duration(seconds: 4),
+            backgroundColor: const Color(0xFF22C55E),
+            duration: const Duration(seconds: 4),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -274,8 +276,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                 const SizedBox(height: 6),
                                 Expanded(
                                   child: _buildResultRow(
-                                    icon: Icons.favorite,
-                                    label: 'HR',
+                                    icon: Icons.monitor_heart,
+                                    label: 'ECG',
                                     value: hrText,
                                   ),
                                 ),
