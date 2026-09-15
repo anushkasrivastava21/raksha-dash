@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/triage_provider.dart';
+import '../models/vitals_model.dart';
 import '../providers/triage_state.dart';
 import '../widgets/app_header.dart';
 import 'telemetry_sync_screen.dart';
@@ -7,8 +9,15 @@ import 'triage_result_screen.dart';
 
 /// Native Flutter implementation of Dashboard 2 (Completed State - RAW VITALS).
 /// Mobile-constrained layout matching original HTML/CSS design specification.
-class DashboardCompletedScreen extends StatelessWidget {
+class DashboardCompletedScreen extends StatefulWidget {
   const DashboardCompletedScreen({super.key});
+
+  @override
+  State<DashboardCompletedScreen> createState() => _DashboardCompletedScreenState();
+}
+
+class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
+  bool _isExecutingTriage = false;
 
   static const Color _surfaceContainerLow = Color(0xFFF6F3F2);
   static const Color _surfaceContainerLowest = Color(0xFFFFFFFF);
@@ -30,6 +39,33 @@ class DashboardCompletedScreen extends StatelessWidget {
         builder: (context) => DynamicTestLoaderScreen(testType: type),
       ),
     );
+  }
+
+  Future<void> _handleExecuteTriage() async {
+    setState(() {
+      _isExecutingTriage = true;
+    });
+
+    try {
+      final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+      final payload = triageProvider.generateJsonPayload();
+      final VitalsModel result = VitalsModel.fromJson(payload);
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TriageResultScreen(vitals: result),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExecutingTriage = false;
+        });
+      }
+    }
   }
 
   @override
@@ -99,8 +135,8 @@ class DashboardCompletedScreen extends StatelessWidget {
                                           isCompleted: triageState.isCompleted(VitalTestType.hr),
                                           icon: triageState.isCompleted(VitalTestType.hr)
                                               ? Icons.check_circle
-                                              : Icons.monitor_heart,
-                                          title: 'HR',
+                                              : Icons.monitor_heart_outlined,
+                                          title: 'ECG',
                                           subtitle: 'Tap to retake Test',
                                           onTap: () => _navigateToTest(context, VitalTestType.hr),
                                         ),
@@ -216,14 +252,7 @@ class DashboardCompletedScreen extends StatelessWidget {
                     child: SizedBox(
                       height: 60.0,
                       child: ElevatedButton.icon(
-                        onPressed: isReady
-                            ? () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const TriageResultScreen()),
-                                );
-                              }
-                            : null,
+                        onPressed: (isReady && !_isExecutingTriage) ? _handleExecuteTriage : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _primaryCobalt,
                           foregroundColor: Colors.white,
@@ -235,10 +264,19 @@ class DashboardCompletedScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4.0),
                           ),
                         ),
-                        icon: const Icon(Icons.memory, size: 24),
-                        label: const Text(
-                          'EXECUTE AI TRIAGE',
-                          style: TextStyle(
+                        icon: _isExecutingTriage
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.0,
+                                ),
+                              )
+                            : const Icon(Icons.memory, size: 24),
+                        label: Text(
+                          _isExecutingTriage ? 'CALCULATING TRIAGE...' : 'EXECUTE AI TRIAGE',
+                          style: const TextStyle(
                             fontFamily: 'Space Mono',
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -265,55 +303,57 @@ class DashboardCompletedScreen extends StatelessWidget {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
-        decoration: BoxDecoration(
-          color: isCompleted ? _completedBg : _surfaceContainerLowest,
-          border: Border.all(
-            color: isCompleted ? _completedGreen : _outlineVariant,
-            width: isCompleted ? 2.0 : 1.0,
-          ),
+    return Material(
+      color: isCompleted ? _completedBg : _surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: isCompleted ? _completedGreen : _outlineVariant,
+          width: isCompleted ? 2.0 : 1.0,
         ),
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Icon(
-                icon,
-                color: isCompleted ? _completedGreen : _outline,
-                size: 24,
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Space Mono',
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: _onSurface,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox.expand(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Icon(
+                    icon,
+                    color: isCompleted ? _completedGreen : _outline,
+                    size: 24,
                   ),
                 ),
-              ),
-            ),
-            Opacity(
-              opacity: isCompleted ? 1.0 : 0.0,
-              child: Text(
-                subtitle,
-                style: TextStyle(
-                  fontFamily: 'Space Mono',
-                  fontSize: 10,
-                  color: isCompleted ? _completedGreen : _outline,
-                  letterSpacing: 1.2,
-                  fontWeight: isCompleted ? FontWeight.w700 : FontWeight.w400,
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: 'Space Mono',
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: _onSurface,
+                      ),
+                    ),
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'Space Mono',
+                    fontSize: 10,
+                    color: isCompleted ? _completedGreen : _outline,
+                    letterSpacing: 1.2,
+                    fontWeight: isCompleted ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/vitals_model.dart';
 import '../providers/triage_provider.dart';
 import '../providers/triage_state.dart';
+import '../services/api_service.dart';
 import '../widgets/app_header.dart';
 import 'base.dart';
 
@@ -21,7 +22,7 @@ class TriageResultScreen extends StatefulWidget {
 }
 
 class _TriageResultScreenState extends State<TriageResultScreen> {
-  bool _isSyncing = false;
+  bool _isSavingToCloud = false;
 
   static const Color _onSurface = Color(0xFF1C1B1B);
   static const Color _outline = Color(0xFF737686);
@@ -32,43 +33,117 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   static const Color _verdictBg = Color(0xFFF0FDF4);
   static const Color _verdictGreen = Color(0xFF22C55E);
 
-  Future<void> _handleSyncToCloud() async {
+  Future<void> _handleSaveToCloud() async {
     setState(() {
-      _isSyncing = true;
+      _isSavingToCloud = true;
     });
 
     try {
       final triageProvider = Provider.of<TriageProvider>(context, listen: false);
-      final success = await triageProvider.syncDataToCloud();
+
+      // Build the canonical payload for the cloud backend
+      Map<String, dynamic> payload;
+      if (widget.vitals != null) {
+        final v = widget.vitals!;
+        final String patientId = v.patientId.isNotEmpty ? v.patientId : triageProvider.patientInfo.id;
+        final String effectiveId = (patientId.isEmpty || patientId == 'PT-0000' || patientId == 'PT-0001')
+            ? 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
+            : patientId;
+        final String timestamp = v.timestamp.isNotEmpty ? v.timestamp : DateTime.now().toIso8601String();
+
+        payload = {
+          "vitals": {
+            "patient_id": effectiveId,
+            "timestamp": timestamp,
+            "stethoscope_status": v.stethoscopeStatus,
+            "ecg_hr": v.ecgHr,
+            "spo2": v.spo2,
+            "temperature": v.temperature,
+            "urine_rgb": v.urineRgb,
+            "patient_speech_text": v.patientSpeechText.isNotEmpty
+                ? v.patientSpeechText
+                : "Auscultation: ${v.stethoscopeStatus}. ECG HR: ${v.ecgHr.toInt()} BPM.",
+          },
+          "triage": {
+            "patient_id": effectiveId,
+            "timestamp": timestamp,
+            "triage": v.triage,
+            "confidence": v.confidence,
+          }
+        };
+      } else {
+        payload = triageProvider.generateJsonPayload();
+      }
+
+      final SaveToCloudResult result = await ApiService.saveToCloud(payload);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? '✅ Telemetry successfully synced to Cloud backend!'
-                : '💾 Network unavailable — Telemetry cached offline safely.',
-            style: const TextStyle(fontFamily: 'Space Mono'),
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(
+                      fontFamily: 'Space Mono',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF22C55E),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
           ),
-          backgroundColor: success ? const Color(0xFF22C55E) : const Color(0xFF004AC6),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(
+                      fontFamily: 'Space Mono',
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sync error: $e',
+            'Save error: $e',
             style: const TextStyle(fontFamily: 'Space Mono'),
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: const Color(0xFFDC2626),
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     } finally {
       if (mounted) {
         setState(() {
-          _isSyncing = false;
+          _isSavingToCloud = false;
         });
       }
     }
@@ -97,7 +172,9 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
 
     final String spo2Text = '${vitals?.spo2.toStringAsFixed(0) ?? "98"}%';
     final String hrText = '${vitals?.ecgHr.toStringAsFixed(0) ?? "72"} BPM';
-    final String tempText = '${vitals?.temperature.toStringAsFixed(1) ?? "98.6"}°F';
+    final String tempText = vitals != null 
+        ? '${(vitals.temperature - 1).toStringAsFixed(1)}°F' 
+        : '97.6°F';
     const String urineText = 'NORMAL';
     final String lungsText = (vitals?.stethoscopeStatus ?? 'CLEAR').toUpperCase();
 
@@ -201,8 +278,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                 const SizedBox(height: 6),
                                 Expanded(
                                   child: _buildResultRow(
-                                    icon: Icons.favorite,
-                                    label: 'HR',
+                                    icon: Icons.monitor_heart,
+                                    label: 'ECG',
                                     value: hrText,
                                   ),
                                 ),
@@ -248,19 +325,19 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Button 1: Sync Data to Cloud
+                        // Button 1: Save to Cloud
                         SizedBox(
                           width: double.infinity,
                           height: 52.0,
                           child: ElevatedButton.icon(
-                            onPressed: _isSyncing ? null : _handleSyncToCloud,
+                            onPressed: _isSavingToCloud ? null : _handleSaveToCloud,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _primaryCobalt,
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: const StadiumBorder(),
                             ),
-                            icon: _isSyncing
+                            icon: _isSavingToCloud
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
@@ -269,9 +346,9 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Icon(Icons.cloud_sync, size: 20),
+                                : const Icon(Icons.cloud_upload, size: 20),
                             label: Text(
-                              _isSyncing ? 'Syncing...' : 'Sync Data to Cloud',
+                              _isSavingToCloud ? 'Saving to Cloud...' : 'Save to Cloud',
                               style: const TextStyle(
                                 fontFamily: 'Space Mono',
                                 fontSize: 16,

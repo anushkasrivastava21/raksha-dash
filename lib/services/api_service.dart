@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform, SocketException, HttpException;
+import 'dart:io' show SocketException, HttpException;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -11,7 +11,7 @@ import '../models/vitals_model.dart';
 
 /// API Service for Render backend hardware telemetry endpoint
 class RenderApiService {
-  static const String baseUrl = 'https://raksha-sim.onrender.com';
+  static String get baseUrl => ApiService.baseUrl;
   static const Duration requestTimeout = Duration(seconds: 35);
 
   /// Fetches hardware vitals telemetry data from Render cloud backend.
@@ -65,16 +65,30 @@ class RenderApiService {
   }
 }
 
+/// Result object for cloud save operations
+class SaveToCloudResult {
+  final bool success;
+  final String message;
+  final int? statusCode;
+
+  const SaveToCloudResult({
+    required this.success,
+    required this.message,
+    this.statusCode,
+  });
+}
+
 /// ApiService with smart environment resolution, automatic CORS fallback,
 /// pre-flight JSON audit, typed exception logging, and offline fail-safe caching.
 class ApiService {
   // ── ENVIRONMENT CONFIGURATION ──────────────────────────────────────────────
   // Set to false = PRODUCTION MODE → all traffic routed to Render cloud
-  // Set to true  = LOCAL MODE       → traffic routed to 127.0.0.1:8000
-  static const bool useLocalServer = false;
+  // Set to true  = LOCAL MODE       → traffic routed to http://172.16.46.141:8000 (Raspberry Pi LAN)
+  static const bool useLocalServer = true;
 
-  // ── PRODUCTION URLS (no trailing slash — prevents double-slash on endpoint append)
-  static const String _productionUrl = 'https://raksha-api-7ie6.onrender.com';
+  // ── PRODUCTION CLOUD BACKEND URL (no trailing slash)
+  static const String cloudBackendUrl = 'https://raksha-api-71a6.onrender.com';
+  static const String _productionUrl = cloudBackendUrl;
   static const String mlEngineUrl = 'https://raksha-sim.onrender.com';
 
   // Request timeout — 35s accounts for Render free-tier cold starts
@@ -82,21 +96,94 @@ class ApiService {
 
   /// Primary Base URL — resolves to production or local depending on flag
   static String get baseUrl {
-    if (!useLocalServer) return _productionUrl;
-    return _localUrl;
+    final resolved = !useLocalServer ? _productionUrl : _localUrl;
+    debugPrint('🌐 [ApiService] Resolved Base URL: $resolved (useLocalServer: $useLocalServer)');
+    return resolved;
   }
 
-  /// Local Base URL resolver
+  /// Local Base URL resolver — returns Pi local IP on all platforms (Android, iOS, desktop, web)
   static String get _localUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
-    }
+    return 'http://172.16.46.141:8000';
+  }
+
+  /// Dedicated method to save vitals & triage data DIRECTLY to Cloud Backend
+  /// (https://raksha-api-71a6.onrender.com), regardless of useLocalServer mode.
+  static Future<SaveToCloudResult> saveToCloud(Map<String, dynamic> payload) async {
+    debugPrint("════════════════════════════════════════════════════");
+    debugPrint("☁️ [SAVE_TO_CLOUD] Dispatching patient payload to: $cloudBackendUrl");
+
+    // 1. Prepare and validate Vitals payload
+    Map<String, dynamic> vitalsPayload;
+    String vitalsJson = "";
+
     try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000'; // Android Emulator host alias
+      vitalsPayload = payload.containsKey("vitals") && payload["vitals"] is Map
+          ? Map<String, dynamic>.from(payload["vitals"])
+          : payload;
+      vitalsJson = jsonEncode(vitalsPayload);
+    } catch (e) {
+      debugPrint("❌ [SAVE_TO_CLOUD] Serialization error: $e");
+      return SaveToCloudResult(
+        success: false,
+        message: "Failed to encode patient data: $e",
+      );
+    }
+
+    // 2. POST /vitals to Cloud Backend
+    try {
+      final Uri vitalsUri = Uri.parse('$cloudBackendUrl/vitals');
+      debugPrint("🚀 [SAVE_TO_CLOUD] POST -> $vitalsUri");
+      debugPrint("📦 Vitals Payload: $vitalsJson");
+
+      final vitalsResponse = await _safePost(vitalsUri, vitalsJson);
+      debugPrint("📥 [SAVE_TO_CLOUD] /vitals HTTP ${vitalsResponse.statusCode}: ${vitalsResponse.body}");
+
+      if (vitalsResponse.statusCode != 200 && vitalsResponse.statusCode != 201) {
+        return SaveToCloudResult(
+          success: false,
+          statusCode: vitalsResponse.statusCode,
+          message: "Server rejected vitals with HTTP ${vitalsResponse.statusCode}: ${vitalsResponse.body}",
+        );
       }
-    } catch (_) {}
-    return 'http://127.0.0.1:8000';
+
+      // 3. POST /triage to Cloud Backend (if triage payload is present)
+      if (payload.containsKey("triage") && payload["triage"] is Map) {
+        try {
+          final triagePayload = Map<String, dynamic>.from(payload["triage"]);
+          final triageJson = jsonEncode(triagePayload);
+          final Uri triageUri = Uri.parse('$cloudBackendUrl/triage');
+          debugPrint("🚀 [SAVE_TO_CLOUD] POST -> $triageUri");
+          debugPrint("📦 Triage Payload: $triageJson");
+
+          final triageResponse = await _safePost(triageUri, triageJson);
+          debugPrint("📥 [SAVE_TO_CLOUD] /triage HTTP ${triageResponse.statusCode}: ${triageResponse.body}");
+        } catch (triageErr) {
+          debugPrint("⚠️ [SAVE_TO_CLOUD] /triage warning: $triageErr");
+        }
+      }
+
+      debugPrint("🎉 [SAVE_TO_CLOUD] Patient successfully persisted to Cloud Backend.");
+      debugPrint("════════════════════════════════════════════════════");
+      return const SaveToCloudResult(
+        success: true,
+        statusCode: 200,
+        message: "Successfully Saved",
+      );
+    } on TimeoutException {
+      debugPrint("⏰ [SAVE_TO_CLOUD] Request timed out.");
+      await cacheFailedPayload(payload);
+      return const SaveToCloudResult(
+        success: true,
+        message: "Saved Locally (Cloud Unreachable)",
+      );
+    } catch (e) {
+      debugPrint("❌ [SAVE_TO_CLOUD] Network/Unexpected error: $e");
+      await cacheFailedPayload(payload);
+      return const SaveToCloudResult(
+        success: true,
+        message: "Saved Locally (Offline Mode)",
+      );
+    }
   }
 
   /// Caches failed sync payloads to shared preferences for safe offline recovery.
@@ -128,16 +215,34 @@ class ApiService {
 
   /// Internal helper to post to an endpoint with timeout and headers
   static Future<http.Response> _safePost(Uri uri, String body) async {
-    return await http
-        .post(
-          uri,
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: body,
-        )
-        .timeout(requestTimeout);
+    try {
+      return await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 8)); // Shorter timeout for faster fallback
+    } catch (firstErr) {
+      if (uri.host.contains('onrender.com') || uri.host.contains('172.16.46.141')) {
+        final fallbackUri = Uri.parse('http://127.0.0.1:8000${uri.path}');
+        debugPrint('⚠️ [ApiService] Primary POST $uri failed ($firstErr). Trying localhost fallback: $fallbackUri');
+        return await http
+            .post(
+              fallbackUri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: body,
+            )
+            .timeout(requestTimeout);
+      }
+      rethrow;
+    }
   }
 
   /// Pushes Vitals telemetry payload to backend (POST /vitals).

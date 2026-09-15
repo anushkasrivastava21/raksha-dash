@@ -199,15 +199,15 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Expanded(
-                                        child: _buildCard(
-                                          isCompleted: triageState.isCompleted(VitalTestType.hr),
-                                          icon: Icons.monitor_heart,
-                                          title: 'HR',
-                                          sensor: 'SENSOR: MAX30102',
-                                          onTap: () => _navigateToTest(context, VitalTestType.hr),
+                                        Expanded(
+                                          child: _buildCard(
+                                            isCompleted: triageState.isCompleted(VitalTestType.hr),
+                                            icon: Icons.monitor_heart_outlined,
+                                            title: 'ECG',
+                                            sensor: 'SENSOR: MAX30102',
+                                            onTap: () => _navigateToTest(context, VitalTestType.hr),
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
@@ -380,67 +380,56 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     required String sensor,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
-        decoration: BoxDecoration(
-          color: isCompleted ? _completedBg : _surfaceContainerLowest,
-          border: Border.all(
-            color: isCompleted ? _completedGreen : _outlineVariant,
-            width: isCompleted ? 2.0 : 1.0,
-          ),
+    return Material(
+      color: isCompleted ? _completedBg : _surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: isCompleted ? _completedGreen : _outlineVariant,
+          width: isCompleted ? 2.0 : 1.0,
         ),
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: Icon(
-                isCompleted ? Icons.check_circle : icon,
-                color: isCompleted ? _completedGreen : _outline,
-                size: 24,
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: 'Space Mono',
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: _onSurface,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox.expand(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Icon(
+                    isCompleted ? Icons.check_circle : icon,
+                    color: isCompleted ? _completedGreen : _outline,
+                    size: 24,
                   ),
                 ),
-              ),
-            ),
-            isCompleted
-                ? const Text(
-                    'Tap to retake Test',
-                    style: TextStyle(
-                      fontFamily: 'Space Mono',
-                      fontSize: 10,
-                      color: _completedGreen,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                : Visibility(
-                    visible: false,
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
+                Expanded(
+                  child: Center(
                     child: Text(
-                      sensor,
+                      title,
                       style: const TextStyle(
                         fontFamily: 'Space Mono',
-                        fontSize: 10,
-                        color: _outline,
-                        letterSpacing: 1.2,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: _onSurface,
                       ),
                     ),
                   ),
-          ],
+                ),
+                Text(
+                  isCompleted ? 'Tap to retake Test' : sensor,
+                  style: TextStyle(
+                    fontFamily: 'Space Mono',
+                    fontSize: 10,
+                    color: isCompleted ? _completedGreen : _outline,
+                    letterSpacing: 1.2,
+                    fontWeight: isCompleted ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

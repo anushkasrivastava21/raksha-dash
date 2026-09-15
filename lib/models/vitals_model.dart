@@ -32,10 +32,28 @@ class VitalsModel {
             ? Map<String, dynamic>.from(json['vitals'])
             : json;
 
-    final List<dynamic> rawRgb =
-        data['urine_rgb'] ?? json['urine_rgb'] ?? [255.0, 255.0, 0.0];
-    final List<double> parsedRgb =
-        rawRgb.map((e) => (e as num).toDouble()).toList();
+    double toDouble(dynamic val, double fallback) {
+      if (val == null) return fallback;
+      if (val is num) return val.toDouble();
+      if (val is String) return double.tryParse(val) ?? fallback;
+      return fallback;
+    }
+
+    List<double> parsedRgb;
+    if ((data.containsKey('urine_r') || json.containsKey('urine_r')) &&
+        (data['urine_r'] != null || json['urine_r'] != null)) {
+      final r = toDouble(data['urine_r'] ?? json['urine_r'], 255.0);
+      final g = toDouble(data['urine_g'] ?? json['urine_g'], 255.0);
+      final b = toDouble(data['urine_b'] ?? json['urine_b'], 0.0);
+      parsedRgb = [r, g, b];
+    } else {
+      final dynamic rawRgb = data['urine_rgb'] ?? json['urine_rgb'];
+      if (rawRgb is List) {
+        parsedRgb = rawRgb.map((e) => toDouble(e, 0.0)).toList();
+      } else {
+        parsedRgb = [255.0, 255.0, 0.0];
+      }
+    }
 
     return VitalsModel(
       patientId: (data['patient_id'] ?? json['patient_id'] ?? '').toString(),
@@ -46,19 +64,15 @@ class VitalsModel {
       stethoscopeStatus:
           (data['stethoscope_status'] ?? json['stethoscope_status'] ?? 'clean')
               .toString(),
-      ecgHr: ((data['ecg_hr'] ?? json['ecg_hr'] ?? 72.0) as num).toDouble(),
-      spo2: ((data['spo2'] ?? json['spo2'] ?? 98.0) as num).toDouble(),
-      temperature:
-          ((data['temperature'] ?? json['temperature'] ?? 36.8) as num)
-              .toDouble(),
+      ecgHr: toDouble(data['ecg_hr'] ?? json['ecg_hr'], 72.0),
+      spo2: toDouble(data['spo2'] ?? json['spo2'], 98.0),
+      temperature: toDouble(data['temperature'] ?? json['temperature'], 36.8),
       urineRgb: parsedRgb,
       patientSpeechText:
           (data['patient_speech_text'] ?? json['patient_speech_text'] ?? '')
               .toString(),
       triage: (json['triage'] ?? data['triage'] ?? 'GREEN').toString(),
-      confidence:
-          ((json['confidence'] ?? data['confidence'] ?? 0.95) as num)
-              .toDouble(),
+      confidence: toDouble(json['confidence'] ?? data['confidence'], 0.95),
     );
   }
 
