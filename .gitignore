@@ -86,3 +86,9 @@ Thumbs.db
 *.iml
 *.iws
 *.ipr
+
+# ── Python Cache ──
+__pycache__/
+*.py[cod]
+*$py.class
+
