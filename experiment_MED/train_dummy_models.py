@@ -129,7 +129,7 @@ def _create_xgboost_model() -> Path:
         "seed": 42,
     }
     booster = xgb.train(params, dtrain, num_boost_round=30)
-    path = MODELS_DIR / "triage_xgboost.json"
+    path = MODELS_DIR / "triage_xgboost.DUMMY.json"
     booster.save_model(str(path))
     log.info("XGBoost triage model saved to %s (%d bytes)", path, path.stat().st_size)
     return path
@@ -142,7 +142,11 @@ def main() -> None:
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     _create_ecg_model()
     _create_urine_model()
-    _create_xgboost_model()
+    # The trained triage booster is ./triage_xgboost.json. A dummy is only made
+    # on request, under a name that can never be mistaken for the real one.
+    import sys
+    if "--with-dummy-triage" in sys.argv:
+        _create_xgboost_model()
     log.info("All models created in %s", MODELS_DIR)
 
 

@@ -2,7 +2,7 @@
 numpy>=1.26
 scipy>=1.11
 requests>=2.31
-xgboost>=2.0
+# xgboost not needed on device: triage uses export_triage_rules.RuleModel
 vosk>=0.3.45            # ASR backend (default)
 rapidfuzz>=3.6          # optional: fuzzy matching for ASR misspellings
 sounddevice>=0.4.6      # optional: live mic capture

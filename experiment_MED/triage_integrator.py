@@ -5,7 +5,11 @@ import logging
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
-import xgboost as xgb
+
+try:                                   # dev laptop
+    import xgboost as xgb
+except ImportError:                    # phone / Termux: exact pure-Python rules
+    xgb = None
 
 from config import get_config
 from ecg_processor import process_ecg
@@ -18,19 +22,25 @@ _CFG = get_config()
 CFG, ECG_CFG, AUDIO_CFG = _CFG.triage, _CFG.ecg, _CFG.audio
 
 _FEATURES = list(CFG.feature_order)
-_booster: Optional[xgb.Booster] = None
+_booster = None
 _booster_ready: Optional[bool] = None
 
 
 # --------------------------------------------------------------------------- #
 # Model
 # --------------------------------------------------------------------------- #
-def _get_booster() -> Optional[xgb.Booster]:
-    """Raw Booster instead of XGBClassifier: no sklearn/pandas round-trip."""
+def _get_booster():
+    """xgboost.Booster if installed, else the exact RuleModel parsed from the
+    same JSON (export_triage_rules.py). Both return identical probabilities."""
     global _booster, _booster_ready
     if _booster_ready is not None:
         return _booster if _booster_ready else None
     try:
+        if xgb is None:
+            from export_triage_rules import load_rule_model
+            _booster, _booster_ready = load_rule_model(CFG.model_path), True
+            log.info("xgboost absent; exact rule evaluator loaded from %s", CFG.model_path)
+            return _booster
         booster = xgb.Booster()
         booster.load_model(str(CFG.model_path))
         _booster, _booster_ready = booster, True
@@ -144,6 +154,8 @@ def _base_probabilities(parsed: Dict[str, Any]) -> np.ndarray:
     if booster is None:
         return np.asarray(CFG.fallback_probs, dtype=np.float32)
     row = np.fromiter((parsed[name] for name in _FEATURES), dtype=np.float32, count=len(_FEATURES))
+    if xgb is None:
+        return booster.predict_proba(row)
     matrix = xgb.DMatrix(row.reshape(1, -1), feature_names=_FEATURES)
     return np.asarray(booster.predict(matrix)[0], dtype=np.float32)
 

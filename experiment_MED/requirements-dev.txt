@@ -2,4 +2,5 @@
 # Dev laptop only - needed for training and for backend parity checks.
 torch>=2.2               # --index-url https://download.pytorch.org/whl/cpu
 transformers>=4.40       # RAKSHA_AUDIO_ASR_BACKEND=transformers, SYMPTOM_BACKEND=ner
+xgboost>=3.1            # trained model stores a per-class base_score vector
 pytest>=8.0
