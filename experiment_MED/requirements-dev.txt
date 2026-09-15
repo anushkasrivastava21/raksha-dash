@@ -1,0 +1,5 @@
+-r requirements-mobile.txt
+# Dev laptop only - needed for training and for backend parity checks.
+torch>=2.2               # --index-url https://download.pytorch.org/whl/cpu
+transformers>=4.40       # RAKSHA_AUDIO_ASR_BACKEND=transformers, SYMPTOM_BACKEND=ner
+pytest>=8.0

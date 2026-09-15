@@ -1,0 +1,13 @@
+# Phone / Termux build - no torch, no transformers.
+numpy>=1.26
+scipy>=1.11
+requests>=2.31
+xgboost>=2.0
+vosk>=0.3.45            # ASR backend (default)
+rapidfuzz>=3.6          # optional: fuzzy matching for ASR misspellings
+sounddevice>=0.4.6      # optional: live mic capture
+onnxruntime>=1.17       # optional: ECG/urine CNNs exported from torch
+
+# Swap the ASR backend by installing ONE of these instead of vosk:
+# pywhispercpp>=1.2      # RAKSHA_AUDIO_ASR_BACKEND=whispercpp
+# faster-whisper>=1.0    # RAKSHA_AUDIO_ASR_BACKEND=faster_whisper
