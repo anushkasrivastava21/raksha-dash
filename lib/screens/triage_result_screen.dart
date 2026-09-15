@@ -166,6 +166,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   @override
   Widget build(BuildContext context) {
     final vitals = widget.vitals;
+    final triageProvider = Provider.of<TriageProvider>(context);
     final String triageText = vitals?.triage ?? 'LOW RISK (STABLE)';
     final String confidenceText = 'AI Confidence: ${((vitals?.confidence ?? 0.94) * 100).toStringAsFixed(0)}%';
     final String patientIdText = 'Patient ID: ${vitals?.patientId ?? "RX-2049"}';
@@ -176,7 +177,9 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
         ? '${(vitals.temperature - 1).toStringAsFixed(1)}°C' 
         : '97.6°C';
     const String urineText = 'NORMAL';
-    final String lungsText = (vitals?.stethoscopeStatus ?? 'CLEAR').toUpperCase();
+    final String lungsText = vitals != null
+        ? vitals.stethoscopeStatus.toUpperCase()
+        : (triageProvider.stethResult?.lungSound.toUpperCase() ?? 'CLEAR');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0EDEC), // Neutral desktop backdrop
