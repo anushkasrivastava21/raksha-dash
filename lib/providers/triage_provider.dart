@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-
+import '../services/mews_service.dart'; 
 // ──────────────────────────────────────────────────────────────────────────────
 // ENUMS
 // ──────────────────────────────────────────────────────────────────────────────
@@ -373,11 +373,26 @@ class TriageProvider extends ChangeNotifier {
     final String activeId = (_patientInfo.id.isEmpty || _patientInfo.id == 'PT-0000' || _patientInfo.id == 'PT-0001')
         ? 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
         : _patientInfo.id;
+
+    // MEWS is computed from the same raw vitals used in generateVitalsJsonPayload
+    // (same fallback chain) so both payloads agree on which numbers were used.
+    final mews = mewsOverride(VitalsSnapshot(
+      heartRate: (_ecgResult?.heartRate ?? _stethResult?.heartRate ?? 72.0).toDouble(),
+      spo2: (_spo2TempResult?.spo2 ?? 98).toDouble(),
+      temperature: (_spo2TempResult?.temperature ?? 36.8).toDouble(),
+    ));
+
+    // MEWS RED/YELLOW always wins and overrides the per-step ScanStatus signal —
+    // this is Finding 2 from the PRD: the override must be the only thing that
+    // reaches the cloud/dashboard when it fires.
+    final String triageColor = mews.override ? mews.displayColor! : (hasAnyAbnormal ? "Yellow" : "Green");
+    final double confidence = mews.override ? 0.99 : (hasAnyAbnormal ? 0.88 : 0.96);
+
     return {
       "patient_id": activeId,
       "timestamp": DateTime.now().toIso8601String(),
-      "triage": hasAnyAbnormal ? "RED" : "GREEN",
-      "confidence": hasAnyAbnormal ? 0.88 : 0.96,
+      "triage": triageColor,
+      "confidence": confidence,
     };
   }
 
@@ -433,9 +448,10 @@ class TriageProvider extends ChangeNotifier {
     );
 
     if (boundsError != null) {
-      debugPrint("⛔ [VALIDATION_ERR] Submission blocked: $boundsError");
-      return false;
-    }
+  debugPrint("⚠️ [OUT_OF_MODEL_RANGE] Syncing anyway — reading outside AI training range: $boundsError");
+  // Do NOT return false. Out-of-range vitals are often the most clinically
+  // critical ones and must never be silently dropped from sync.
+}
 
     final payload = generateJsonPayload();
     return await ApiService.pushTriageData(payload);
