@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/environment_config.dart';
 import '../models/vitals_model.dart';
 
 /// API Service for Render backend hardware telemetry endpoint
@@ -80,29 +81,19 @@ class SaveToCloudResult {
 /// ApiService with smart environment resolution, automatic CORS fallback,
 /// pre-flight JSON audit, typed exception logging, and offline fail-safe caching.
 class ApiService {
-  // ── ENVIRONMENT CONFIGURATION ──────────────────────────────────────────────
-  // Set to false = PRODUCTION MODE → all traffic routed to Render cloud
-  // Set to true  = LOCAL MODE       → traffic routed to http://172.16.46.141:8000 (Raspberry Pi LAN)
-  static const bool useLocalServer = true;
-
-  // ── PRODUCTION CLOUD BACKEND URL (no trailing slash)
-  static const String cloudBackendUrl = 'https://raksha-api-71a6.onrender.com';
-  static const String _productionUrl = cloudBackendUrl;
-  static const String mlEngineUrl = 'https://raksha-sim.onrender.com';
+  static bool get useLocalServer => EnvironmentConfig.useLocalServer;
+  static String get cloudBackendUrl => EnvironmentConfig.apiBaseUrl;
+  static String get mlEngineUrl => EnvironmentConfig.mlEngineUrl;
+  static String get _localUrl => EnvironmentConfig.localServerIp;
 
   // Request timeout — 35s accounts for Render free-tier cold starts
   static const Duration requestTimeout = Duration(seconds: 35);
 
   /// Primary Base URL — resolves to production or local depending on flag
   static String get baseUrl {
-    final resolved = !useLocalServer ? _productionUrl : _localUrl;
+    final resolved = EnvironmentConfig.resolvedBaseUrl;
     debugPrint('🌐 [ApiService] Resolved Base URL: $resolved (useLocalServer: $useLocalServer)');
     return resolved;
-  }
-
-  /// Local Base URL resolver — returns Pi local IP on all platforms (Android, iOS, desktop, web)
-  static String get _localUrl {
-    return 'http://172.16.46.141:8000';
   }
 
   /// Dedicated method to save vitals & triage data DIRECTLY to Cloud Backend
@@ -213,7 +204,7 @@ class ApiService {
   }
 
   /// Attempts to flush all locally cached payloads to the backend.
-  static Future<void> flushOfflineCache() async {
+  static Future<void> flushOfflineQueue() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       List<String> offlineData = prefs.getStringList('unsynced_patients') ?? [];
@@ -258,9 +249,9 @@ class ApiService {
       await prefs.setStringList('unsynced_patients', remainingData);
       
       if (successCount > 0) {
-        debugPrint("🎉 [OFFLINE_CACHE] Successfully flushed $successCount patient(s) to cloud!");
+        debugPrint("♻️ [OFFLINE_CACHE] Successfully flushed $successCount patient(s) to cloud!");
       }
-    } catch (e, stack) {
+    } catch (e) {
       debugPrint("❌ [OFFLINE_CACHE_ERR] Failed during cache flush: $e");
     }
   }

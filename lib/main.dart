@@ -40,7 +40,7 @@ Future<void> main() async {
   // Actually, to not block UI thread on timeout, we will not await it,
   // and use ignore: discarded_futures just in case.
   // ignore: discarded_futures, unawaited_futures
-  ApiService.flushOfflineCache();
+  ApiService.flushOfflineQueue();
 
   final prefs = await SharedPreferences.getInstance();
   final bool isAuthenticated = prefs.getBool('is_authenticated') ?? false;
