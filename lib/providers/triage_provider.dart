@@ -1,8 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../services/mews_service.dart'; 
+import '../services/mews_service.dart';
+import '../services/triage_scaffold.dart';
+import '../services/keyword_extractor.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 // ENUMS
 // ──────────────────────────────────────────────────────────────────────────────
@@ -173,6 +174,14 @@ class TriageProvider extends ChangeNotifier {
 
   UrineResult? _urineResult;
   UrineResult? get urineResult => _urineResult;
+
+  String _patientTranscript = "";
+  String get patientTranscript => _patientTranscript;
+
+  void setPatientTranscript(String transcript) {
+    _patientTranscript = transcript;
+    notifyListeners();
+  }
 
   // ════════════════════════════════════════════════════════════════════════
   // HARDWARE DATA APPLIERS (Direct Hardware Telemetry Ingestion)
@@ -364,8 +373,9 @@ class TriageProvider extends ChangeNotifier {
       "spo2": (_spo2TempResult?.spo2 ?? 98).toDouble(),
       "temperature": (_spo2TempResult?.temperature ?? 36.8).toDouble(),
       "urine_rgb": _urineResult?.rawRgb ?? _getUrineRgb(_urineResult?.color),
-      "patient_speech_text":
-          "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
+      "patient_speech_text": _patientTranscript.isNotEmpty 
+          ? _patientTranscript 
+          : "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
     };
   }
 
@@ -382,11 +392,21 @@ class TriageProvider extends ChangeNotifier {
       temperature: (_spo2TempResult?.temperature ?? 36.8).toDouble(),
     ));
 
-    // MEWS RED/YELLOW always wins and overrides the per-step ScanStatus signal —
+    // Compute ML-based triage from XGBoost rule table
+    final triageInputs = TriageInputs(
+      ecgHr: (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble(),
+      spo2: _spo2TempResult?.spo2.toDouble(),
+      temperature: _spo2TempResult?.temperature,
+      urineSeverity: _urineStatus == ScanStatus.abnormal ? 2.0 : 1.0, 
+      symptomKeywords: KeywordExtractor.extractSymptoms(_patientTranscript),
+    );
+    final mlTriage = evaluateTriage(triageInputs);
+
+    // MEWS RED/YELLOW always wins and overrides the ML base signal —
     // this is Finding 2 from the PRD: the override must be the only thing that
     // reaches the cloud/dashboard when it fires.
-    final String triageColor = mews.override ? mews.displayColor! : (hasAnyAbnormal ? "Yellow" : "Green");
-    final double confidence = mews.override ? 0.99 : (hasAnyAbnormal ? 0.88 : 0.96);
+    final String triageColor = mews.override ? mews.displayColor! : mlTriage.triageColor;
+    final double confidence = mews.override ? 0.99 : mlTriage.confidence;
 
     return {
       "patient_id": activeId,
@@ -525,6 +545,7 @@ class TriageProvider extends ChangeNotifier {
     _ecgResult = null;
     _spo2TempResult = null;
     _urineResult = null;
+    _patientTranscript = "";
 
     if (pageController.hasClients) {
       pageController.jumpToPage(0);
