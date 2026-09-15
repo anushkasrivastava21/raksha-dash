@@ -29,9 +29,23 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   static const Color _cardBorder = Color(0xFFE5E7EB);
   static const Color _primaryCobalt = Color(0xFF004AC6);
 
-  // Verdict green constants (#F0FDF4 & #22C55E)
-  static const Color _verdictBg = Color(0xFFF0FDF4);
-  static const Color _verdictGreen = Color(0xFF22C55E);
+  Color _getVerdictBg(String triage) {
+    if (triage == 'RED') return const Color(0xFFFEF2F2);
+    if (triage == 'YELLOW') return const Color(0xFFFEFCE8);
+    return const Color(0xFFF0FDF4); // GREEN
+  }
+
+  Color _getVerdictBorder(String triage) {
+    if (triage == 'RED') return const Color(0xFFDC2626);
+    if (triage == 'YELLOW') return const Color(0xFFEAB308);
+    return const Color(0xFF22C55E); // GREEN
+  }
+
+  IconData _getVerdictIcon(String triage) {
+    if (triage == 'RED') return Icons.warning_rounded;
+    if (triage == 'YELLOW') return Icons.info_outline_rounded;
+    return Icons.check; // GREEN
+  }
 
   Future<void> _handleSaveToCloud() async {
     setState(() {
@@ -166,17 +180,50 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   @override
   Widget build(BuildContext context) {
     final vitals = widget.vitals;
-    final String triageText = vitals?.triage ?? 'LOW RISK (STABLE)';
-    final String confidenceText = 'AI Confidence: ${((vitals?.confidence ?? 0.94) * 100).toStringAsFixed(0)}%';
-    final String patientIdText = 'Patient ID: ${vitals?.patientId ?? "RX-2049"}';
+    final triageProvider = Provider.of<TriageProvider>(context);
 
-    final String spo2Text = '${vitals?.spo2.toStringAsFixed(0) ?? "98"}%';
-    final String hrText = '${vitals?.ecgHr.toStringAsFixed(0) ?? "72"} BPM';
+    String triageText = 'GREEN';
+    double confidence = 0.99;
+    String patientId = "RX-2049";
+
+    if (vitals != null) {
+      triageText = vitals.triage;
+      confidence = vitals.confidence;
+      patientId = vitals.patientId;
+    } else {
+      final payload = triageProvider.generateTriageJsonPayload();
+      triageText = payload["triage"] as String;
+      confidence = payload["confidence"] as double;
+      patientId = payload["patient_id"] as String;
+    }
+
+    final String confidenceText = 'AI Confidence: ${(confidence * 100).toStringAsFixed(0)}%';
+    final String patientIdText = 'Patient ID: $patientId';
+
+    final Color bgColor = _getVerdictBg(triageText);
+    final Color borderColor = _getVerdictBorder(triageText);
+    final IconData iconData = _getVerdictIcon(triageText);
+
+    final String spo2Text = vitals != null 
+        ? '${vitals.spo2.toStringAsFixed(0)}%' 
+        : '${triageProvider.spo2TempResult?.spo2.toStringAsFixed(0) ?? "98"}%';
+        
+    final String hrText = vitals != null
+        ? '${vitals.ecgHr.toStringAsFixed(0)} BPM'
+        : '${triageProvider.ecgResult?.heartRate.toStringAsFixed(0) ?? triageProvider.stethResult?.heartRate.toStringAsFixed(0) ?? "72"} BPM';
+        
     final String tempText = vitals != null 
         ? '${(vitals.temperature - 1).toStringAsFixed(1)}°C' 
-        : '97.6°C';
-    const String urineText = 'NORMAL';
-    final String lungsText = (vitals?.stethoscopeStatus ?? 'CLEAR').toUpperCase();
+        : '${((triageProvider.spo2TempResult?.temperature ?? 37.8) - 1).toStringAsFixed(1)}°C';
+        
+    final String urineText = vitals != null 
+        ? 'NORMAL' 
+        : (triageProvider.urineStatus == ScanStatus.abnormal ? 'ABNORMAL' : 'NORMAL');
+        
+    final String lungsText = vitals != null
+        ? vitals.stethoscopeStatus.toUpperCase()
+        : (triageProvider.stethResult?.status.toUpperCase() ?? 'CLEAR');
+
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0EDEC), // Neutral desktop backdrop
@@ -204,8 +251,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                           Container(
                             width: double.infinity,
                             decoration: BoxDecoration(
-                              color: _verdictBg,
-                              border: Border.all(color: _verdictGreen, width: 2.0),
+                              color: bgColor,
+                              border: Border.all(color: borderColor, width: 2.0),
                               borderRadius: BorderRadius.circular(12.0),
                             ),
                             padding: const EdgeInsets.all(16.0),
@@ -214,12 +261,12 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                 Container(
                                   width: 48.0,
                                   height: 48.0,
-                                  decoration: const BoxDecoration(
-                                    color: _verdictGreen,
+                                  decoration: BoxDecoration(
+                                    color: borderColor,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
-                                    Icons.check,
+                                  child: Icon(
+                                    iconData,
                                     color: Colors.white,
                                     size: 28,
                                   ),
@@ -273,6 +320,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                     icon: Icons.air,
                                     label: 'SPO2',
                                     value: spo2Text,
+                                    borderColor: borderColor,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -281,6 +329,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                     icon: Icons.monitor_heart,
                                     label: 'ECG',
                                     value: hrText,
+                                    borderColor: borderColor,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -289,6 +338,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                     icon: Icons.thermostat,
                                     label: 'TEMP',
                                     value: tempText,
+                                    borderColor: borderColor,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -297,6 +347,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                     icon: Icons.water_drop,
                                     label: 'URINE',
                                     value: urineText,
+                                    borderColor: borderColor,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -305,6 +356,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                     icon: Icons.medical_services,
                                     label: 'LUNGS',
                                     value: lungsText,
+                                    borderColor: borderColor,
                                   ),
                                 ),
                               ],
@@ -410,6 +462,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
     required IconData icon,
     required String label,
     required String value,
+    required Color borderColor,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -455,8 +508,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
             child: Container(
               width: 10.0,
               height: 10.0,
-              decoration: const BoxDecoration(
-                color: _verdictGreen,
+              decoration: BoxDecoration(
+                color: borderColor,
                 shape: BoxShape.circle,
               ),
             ),
