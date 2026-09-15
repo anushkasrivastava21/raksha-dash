@@ -79,14 +79,14 @@ void main() {
   });
 
   group('MewsResult.displayColor', () {
-    test('RED -> "Red"', () {
+    test('RED -> "RED"', () {
       const result = MewsResult(override: true, status: 'RED', reason: 'x');
-      expect(result.displayColor, 'Red');
+      expect(result.displayColor, 'RED');
     });
 
-    test('YELLOW -> "Yellow"', () {
+    test('YELLOW -> "YELLOW"', () {
       const result = MewsResult(override: true, status: 'YELLOW', reason: 'x');
-      expect(result.displayColor, 'Yellow');
+      expect(result.displayColor, 'YELLOW');
     });
 
     test('NONE -> null', () {
