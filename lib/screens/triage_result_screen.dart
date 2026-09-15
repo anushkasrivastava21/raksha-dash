@@ -181,9 +181,11 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   Widget build(BuildContext context) {
     final vitals = widget.vitals;
     final triageProvider = Provider.of<TriageProvider>(context);
-    final String triageText = vitals?.triage ?? 'LOW RISK (STABLE)';
-    final String confidenceText = 'AI Confidence: ${((vitals?.confidence ?? 0.94) * 100).toStringAsFixed(0)}%';
-    final String patientIdText = 'Patient ID: ${vitals?.patientId ?? "RX-2049"}';
+    String triageText;
+    double confidence;
+    String patientId;
+    String confidenceText;
+    String patientIdText;
 
     if (vitals != null) {
       triageText = vitals.triage;
@@ -196,8 +198,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
       patientId = payload["patient_id"] as String;
     }
 
-    final String confidenceText = 'AI Confidence: ${(confidence * 100).toStringAsFixed(0)}%';
-    final String patientIdText = 'Patient ID: $patientId';
+    confidenceText = 'AI Confidence: ${(confidence * 100).toStringAsFixed(0)}%';
+    patientIdText = 'Patient ID: $patientId';
 
     final Color bgColor = _getVerdictBg(triageText);
     final Color borderColor = _getVerdictBorder(triageText);
