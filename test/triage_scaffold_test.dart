@@ -11,7 +11,7 @@ void main() {
         urineSeverity: 1.0,
         symptomKeywords: [],
       ));
-      expect(result.triageColor, "Green");
+      expect(result.triageColor, "GREEN");
     });
 
     test('Heart rate slightly above bounds returns Yellow', () {
@@ -21,7 +21,7 @@ void main() {
         temperature: 37.0,
         symptomKeywords: [],
       ));
-      expect(result.triageColor, "Yellow");
+      expect(result.triageColor, "YELLOW");
     });
 
     test('SpO2 extremely low returns Red', () {
@@ -31,7 +31,7 @@ void main() {
         temperature: 37.0,
         symptomKeywords: [],
       ));
-      expect(result.triageColor, "Red");
+      expect(result.triageColor, "RED");
     });
 
     test('Symptom keywords present returns Yellow', () {
@@ -41,7 +41,7 @@ void main() {
         temperature: 37.0,
         symptomKeywords: ["chest pain"],
       ));
-      expect(result.triageColor, "Yellow");
+      expect(result.triageColor, "YELLOW");
     });
   });
 }
