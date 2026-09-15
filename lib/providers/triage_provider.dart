@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/mews_service.dart';
 import '../services/triage_scaffold.dart';
-
+import '../services/keyword_extractor.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 // ENUMS
 // ──────────────────────────────────────────────────────────────────────────────
@@ -174,6 +174,14 @@ class TriageProvider extends ChangeNotifier {
 
   UrineResult? _urineResult;
   UrineResult? get urineResult => _urineResult;
+
+  String _patientTranscript = "";
+  String get patientTranscript => _patientTranscript;
+
+  void setPatientTranscript(String transcript) {
+    _patientTranscript = transcript;
+    notifyListeners();
+  }
 
   // ════════════════════════════════════════════════════════════════════════
   // HARDWARE DATA APPLIERS (Direct Hardware Telemetry Ingestion)
@@ -359,8 +367,9 @@ class TriageProvider extends ChangeNotifier {
       "spo2": (_spo2TempResult?.spo2 ?? 98).toDouble(),
       "temperature": (_spo2TempResult?.temperature ?? 36.8).toDouble(),
       "urine_rgb": _urineResult?.rawRgb ?? _getUrineRgb(_urineResult?.color),
-      "patient_speech_text":
-          "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
+      "patient_speech_text": _patientTranscript.isNotEmpty 
+          ? _patientTranscript 
+          : "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
     };
   }
 
@@ -369,16 +378,7 @@ class TriageProvider extends ChangeNotifier {
         ? 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
         : _patientInfo.id;
 
-    // ── LIVE BLE SENSOR INPUTS ─────────────────────────────────────────────
-    final double? liveEcgHr =
-        (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble();
-    final double? liveSpo2 = (_spo2TempResult?.spo2)?.toDouble();
-    final double? liveTemp = _spo2TempResult?.temperature;
-
-    // ── URINE SEVERITY DERIVATION ──────────────────────────────────────────
-    // 1.0 = Normal. Increment for each abnormal strip marker.
-    // TODO(ecg-integration): Replace with real urine-strip severity from
-    // hardware once Anirudh's urine-severity float is available on the BLE payload.
+    // ── URINE SEVERITY DERIVATION (From Arnav's BLE branch) ─────────────
     double? liveUrineSeverity;
     if (_urineResult != null) {
       double severity = 1.0;
@@ -387,32 +387,40 @@ class TriageProvider extends ChangeNotifier {
       if (_urineResult!.color.toLowerCase() == 'red' ||
           _urineResult!.color.toLowerCase() == 'dark brown') severity += 1.0;
       liveUrineSeverity = severity;
+    } else {
+      liveUrineSeverity = _urineStatus == ScanStatus.abnormal ? 2.0 : 1.0;
     }
 
-    // ── PENDING INTEGRATIONS — STRICT PLACEHOLDERS ────────────────────────
-    // DO NOT remove or unwrap these until the corresponding pipeline is live.
+    // MEWS is computed from the same raw vitals used in generateVitalsJsonPayload
+    // (same fallback chain) so both payloads agree on which numbers were used.
+    final mews = mewsOverride(VitalsSnapshot(
+      heartRate: (_ecgResult?.heartRate ?? _stethResult?.heartRate ?? 72.0).toDouble(),
+      spo2: (_spo2TempResult?.spo2 ?? 98).toDouble(),
+      temperature: (_spo2TempResult?.temperature ?? 36.8).toDouble(),
+    ));
 
-    // PLACEHOLDER: ECG abnormality flag (Vaibhavi's ECG classifier output).
-    // TODO(ecg-integration): Wire real isEcgAbnormal from EcgResult once
-    // the on-device TFLite ECG model is integrated.
-    // ignore: unused_local_variable
-    final bool isEcgAbnormal = false;
-
-    // PLACEHOLDER: Spoken symptom keywords extracted by STT pipeline.
-    // TODO(stt-integration): Replace with parsed keywords from the Speech-to-Text
-    // NLP extractor once the voice module is wired to TriageProvider.
-    final List<String> symptoms = [];
-
-    // ── XGBoost RULE TABLE EVALUATION ────────────────────────────────────
-    final TriageResult result = evaluateTriage(
-      TriageInputs(
-        ecgHr: liveEcgHr,
-        spo2: liveSpo2,
-        temperature: liveTemp,
-        urineSeverity: liveUrineSeverity,
-        symptomKeywords: symptoms,
-      ),
+    // Compute ML-based triage from XGBoost rule table
+    final triageInputs = TriageInputs(
+      ecgHr: (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble(),
+      spo2: _spo2TempResult?.spo2.toDouble(),
+      temperature: _spo2TempResult?.temperature,
+      urineSeverity: liveUrineSeverity,
+      symptomKeywords: KeywordExtractor.extractSymptoms(_patientTranscript),
     );
+    final mlTriage = evaluateTriage(triageInputs);
+
+    // MEWS RED/YELLOW always wins and overrides the ML base signal —
+    // this is Finding 2 from the PRD: the override must be the only thing that
+    // reaches the cloud/dashboard when it fires.
+    final String triageColor = mews.override ? mews.displayColor! : mlTriage.triageColor;
+    final double confidence = mews.override ? 0.99 : mlTriage.confidence;
+
+    return {
+      "patient_id": activeId,
+      "timestamp": DateTime.now().toIso8601String(),
+      "triage": triageColor,
+      "confidence": confidence,
+    };
 
     return {
       "patient_id": activeId,
@@ -474,9 +482,10 @@ class TriageProvider extends ChangeNotifier {
     );
 
     if (boundsError != null) {
-      debugPrint("⛔ [VALIDATION_ERR] Submission blocked: $boundsError");
-      return false;
-    }
+  debugPrint("⚠️ [OUT_OF_MODEL_RANGE] Syncing anyway — reading outside AI training range: $boundsError");
+  // Do NOT return false. Out-of-range vitals are often the most clinically
+  // critical ones and must never be silently dropped from sync.
+}
 
     final payload = generateJsonPayload();
     return await ApiService.pushTriageData(payload);
@@ -550,6 +559,7 @@ class TriageProvider extends ChangeNotifier {
     _ecgResult = null;
     _spo2TempResult = null;
     _urineResult = null;
+    _patientTranscript = "";
 
     if (pageController.hasClients) {
       pageController.jumpToPage(0);

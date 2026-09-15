@@ -1,4 +1,4 @@
-﻿// XGBoost Triage Rule Table (Range-based Fallback)
+// XGBoost Triage Rule Table (Range-based Fallback)
 // Built using aggregate boundaries from Anirudh's 'triage_rules_export.csv'.
 // Note: This uses standard boundary ranges since the full decision tree
 // was not provided. Values outside these bounds trigger Yellow/Red.
@@ -6,7 +6,7 @@
 class TriageInputs {
   final double? ecgHr; // Heart Rate (BPM)
   final double? spo2; // SpO2 (%)
-  final double? temperature; // Temperature (┬░C)
+  final double? temperature; // Temperature (°C)
   final double? urineSeverity; // Urine Severity (1.0 = Normal)
   final List<String> symptomKeywords;
 

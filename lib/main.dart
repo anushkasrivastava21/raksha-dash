@@ -21,9 +21,9 @@ Future<void> requestBlePermissions() async {
   ].request();
 
   if (statuses.values.every((status) => status.isGranted)) {
-    print("W: BLE Permissions granted.");
+    debugPrint("W: BLE Permissions granted.");
   } else {
-    print("FATAL: BLE Permissions denied.");
+    debugPrint("FATAL: BLE Permissions denied.");
   }
 }
 

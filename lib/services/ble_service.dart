@@ -26,10 +26,10 @@ class BleService {
   bool _isConnecting = false;
 
   // Custom Constants
-  static const String TARGET_DEVICE_NAME = "ESP32_VitalsRig_01";
-  static final Guid SERVICE_UUID = Guid("6fa41660-6244-4aa0-aee4-06d9377ad51b");
-  static final Guid RX_CHAR_UUID = Guid("bf9dace6-017f-4793-abf9-5d117db16e55");
-  static final Guid TX_CHAR_UUID = Guid("41d5a28d-de2a-4ab4-aa6e-31ab8472925c");
+  static const String targetDeviceName = "ESP32_VitalsRig_01";
+  static final Guid serviceUuid = Guid("6fa41660-6244-4aa0-aee4-06d9377ad51b");
+  static final Guid rxCharUuid = Guid("bf9dace6-017f-4793-abf9-5d117db16e55");
+  static final Guid txCharUuid = Guid("41d5a28d-de2a-4ab4-aa6e-31ab8472925c");
 
   // Chunking Buffer State
   final Map<int, List<int>> _chunkBuffer = {};
@@ -52,7 +52,7 @@ class BleService {
           final name = r.device.platformName;
           final advName = r.device.advName;
           
-          if (name == TARGET_DEVICE_NAME || advName == TARGET_DEVICE_NAME) {
+          if (name == targetDeviceName || advName == targetDeviceName) {
             await FlutterBluePlus.stopScan();
             
             if (_device == null || _device!.remoteId != r.device.remoteId) {
@@ -82,23 +82,23 @@ class BleService {
                   BluetoothService? targetService;
                   
                   for (BluetoothService s in services) {
-                    if (s.serviceUuid == SERVICE_UUID) {
+                    if (s.serviceUuid == serviceUuid) {
                       targetService = s;
                       break;
                     }
                   }
 
                   if (targetService == null) {
-                    debugPrint('FATAL: Target Service UUID $SERVICE_UUID not found!');
+                    debugPrint('FATAL: Target Service UUID $serviceUuid not found!');
                     if (!completer.isCompleted) completer.complete(false);
                     return;
                   }
 
                   // Bind Characteristics
                   for (BluetoothCharacteristic c in targetService.characteristics) {
-                    if (c.characteristicUuid == RX_CHAR_UUID) {
+                    if (c.characteristicUuid == rxCharUuid) {
                       _rxCharacteristic = c;
-                    } else if (c.characteristicUuid == TX_CHAR_UUID) {
+                    } else if (c.characteristicUuid == txCharUuid) {
                       _txCharacteristic = c;
                     }
                   }
@@ -123,7 +123,7 @@ class BleService {
       });
 
       await FlutterBluePlus.startScan(
-        withServices: [SERVICE_UUID], 
+        withServices: [serviceUuid], 
         timeout: const Duration(seconds: 15)
       );
 
