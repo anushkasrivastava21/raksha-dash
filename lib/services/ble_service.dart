@@ -158,9 +158,10 @@ class BleService {
     }
 
     _reconnectAttempts++;
-    debugPrint('Attempting auto-reconnect (Attempt $_reconnectAttempts of $_maxReconnectAttempts) in 2 seconds...');
+    final int delaySeconds = 1 << _reconnectAttempts; // 2^1=2, 2^2=4, 2^3=8
+    debugPrint('Attempting auto-reconnect (Attempt $_reconnectAttempts of $_maxReconnectAttempts) in $delaySeconds seconds...');
     
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(Duration(seconds: delaySeconds));
     
     bool success = await connectToEsp32();
     if (success) {
