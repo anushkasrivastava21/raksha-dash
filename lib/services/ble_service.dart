@@ -180,7 +180,7 @@ class BleService {
     if (_txCharacteristic == null) return;
     
     await _txCharacteristic!.setNotifyValue(true);
-    _notifySub = _txCharacteristic!.lastValueStream.listen((value) {
+    _notifySub = _txCharacteristic!.onValueReceived.listen((value) {
       if (value.isEmpty) return;
       
       // Implement Custom Chunking Parser
@@ -271,11 +271,26 @@ class BleService {
 
   Future<void> sendCommand(String cmd) async {
     if (_rxCharacteristic != null && isConnected) {
+      final props = _rxCharacteristic!.properties;
+      final bool canWriteNoResponse = props.writeWithoutResponse;
       try {
-        await _rxCharacteristic!.write(utf8.encode(cmd), withoutResponse: false);
-        debugPrint('Sent command: $cmd');
+        await _rxCharacteristic!.write(
+          utf8.encode(cmd),
+          withoutResponse: canWriteNoResponse,
+        );
+        debugPrint('Sent command: $cmd (withoutResponse: $canWriteNoResponse)');
       } catch (e) {
-        debugPrint('Failed to send command: $e');
+        debugPrint('Failed to send command with withoutResponse=$canWriteNoResponse: $e');
+        try {
+          // Fallback to the opposite transaction type defensively
+          await _rxCharacteristic!.write(
+            utf8.encode(cmd),
+            withoutResponse: !canWriteNoResponse,
+          );
+          debugPrint('Sent command with fallback withoutResponse=${!canWriteNoResponse}');
+        } catch (fallbackErr) {
+          debugPrint('BLE fallback write failed: $fallbackErr');
+        }
       }
     }
   }

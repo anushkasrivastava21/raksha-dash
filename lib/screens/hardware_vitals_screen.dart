@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/vitals_model.dart';
@@ -54,6 +55,48 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
         setState(() {
           _rawBleData = data;
         });
+
+        // The exact break in the pipeline: Parse telemetry and update UI state!
+        try {
+          final parts = data.split('|').map((e) => e.trim()).toList();
+          if (parts.length >= 2) {
+            final sensorCode = parts[0];
+            final jsonPayload = parts[1];
+            
+            final triageProvider = context.read<TriageProvider>();
+            final triageState = context.read<TriageState>();
+            
+            // 1. Update the actual values in the data provider
+            triageProvider.updateFromBleJson(sensorCode, jsonPayload);
+            
+            // 2. Extract specific values for the UI State Completion checkmarks
+            final Map<String, dynamic> parsed = jsonDecode(jsonPayload);
+            switch (sensorCode) {
+              case 'SPO2':
+              case 'MAX30102':
+                if (parsed.containsKey('spo2')) {
+                  triageState.markCompleted(VitalTestType.spo2, reading: "${parsed['spo2']}%");
+                }
+                if (parsed.containsKey('hr')) {
+                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['hr']} BPM");
+                }
+                break;
+              case 'TEMP':
+              case 'MLX90614':
+                if (parsed.containsKey('temp')) {
+                  triageState.markCompleted(VitalTestType.temp, reading: "${parsed['temp']}°C");
+                }
+                break;
+              case 'URINE':
+                if (parsed.containsKey('color')) {
+                  triageState.markCompleted(VitalTestType.urine, reading: "${parsed['color']}");
+                }
+                break;
+            }
+          }
+        } catch (e) {
+          debugPrint("UI telemetry parsing error: $e");
+        }
       }
     });
     // Preload speech model
