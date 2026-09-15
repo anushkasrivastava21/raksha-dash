@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/vitals_model.dart';
@@ -5,6 +6,7 @@ import '../providers/triage_state.dart';
 import '../providers/triage_provider.dart';
 import '../patient_provider.dart';
 import '../services/ble_service.dart';
+import '../services/speech_service.dart';
 import '../widgets/app_header.dart';
 import 'telemetry_sync_screen.dart';
 import 'triage_result_screen.dart';
@@ -39,6 +41,11 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   String _rawBleData = "";
   bool _isConnecting = false;
 
+  // Speech integration state
+  StreamSubscription<String>? _speechSubscription;
+  bool _isListening = false;
+  String _liveTranscript = "";
+
   @override
   void initState() {
     super.initState();
@@ -49,9 +56,61 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
         });
       }
     });
+    // Preload speech model
+    AppSpeechService().initialize();
+  }
+
+  @override
+  void dispose() {
+    _speechSubscription?.cancel();
+    AppSpeechService().dispose(); // Strict memory release on pop
+    super.dispose();
+  }
+
+  Future<void> _toggleMicrophone() async {
+    final speechService = AppSpeechService();
+    final triageState = context.read<TriageState>();
+    final triageProvider = context.read<TriageProvider>();
+
+    if (_isListening) {
+      await speechService.stopListening();
+      _speechSubscription?.cancel();
+      
+      setState(() {
+        _isListening = false;
+      });
+      
+      // Inject final transcript to XGBoost extraction
+      triageProvider.setPatientTranscript(_liveTranscript);
+      triageState.markCompleted(VitalTestType.voice, reading: "RECORDED");
+    } else {
+      setState(() {
+        _isListening = true;
+        _liveTranscript = "";
+      });
+      
+      triageState.markLoading(VitalTestType.voice);
+      
+      final stream = speechService.startListening();
+      if (stream != null) {
+        _speechSubscription = stream.listen((transcript) {
+          if (mounted) {
+            setState(() {
+              _liveTranscript = transcript;
+            });
+            // Update provider live
+            triageProvider.setPatientTranscript(transcript);
+          }
+        });
+      }
+    }
   }
 
   void _navigateToTest(BuildContext context, VitalTestType type) {
+    if (type == VitalTestType.voice) {
+      _toggleMicrophone();
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -309,15 +368,19 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                 width: 80.0,
                                 height: 80.0,
                                 decoration: BoxDecoration(
-                                  color: triageState.isCompleted(VitalTestType.voice)
-                                      ? _completedBg
-                                      : Colors.white,
+                                  color: _isListening
+                                      ? Colors.red.withValues(alpha: 0.1)
+                                      : triageState.isCompleted(VitalTestType.voice)
+                                          ? _completedBg
+                                          : Colors.white,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: triageState.isCompleted(VitalTestType.voice)
-                                        ? _completedGreen
-                                        : _borderGray,
-                                    width: triageState.isCompleted(VitalTestType.voice) ? 2.0 : 1.0,
+                                    color: _isListening
+                                        ? Colors.red
+                                        : triageState.isCompleted(VitalTestType.voice)
+                                            ? _completedGreen
+                                            : _borderGray,
+                                    width: triageState.isCompleted(VitalTestType.voice) || _isListening ? 2.0 : 1.0,
                                   ),
                                   boxShadow: const [
                                     BoxShadow(
@@ -328,12 +391,14 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                   ],
                                 ),
                                 child: Icon(
-                                  triageState.isCompleted(VitalTestType.voice)
+                                  triageState.isCompleted(VitalTestType.voice) && !_isListening
                                       ? Icons.check_circle
                                       : Icons.mic,
-                                  color: triageState.isCompleted(VitalTestType.voice)
-                                      ? _completedGreen
-                                      : _primaryContainer,
+                                  color: _isListening
+                                      ? Colors.red
+                                      : triageState.isCompleted(VitalTestType.voice)
+                                          ? _completedGreen
+                                          : _primaryContainer,
                                   size: 38,
                                 ),
                               ),
