@@ -49,6 +49,69 @@ We have built a portable, multi-sensory edge device that revolutionizes rural tr
 
 ---
 
+## Architecture & System Design
+Raksha operates on a tiered, edge-heavy architecture to ensure maximum reliability in low-connectivity zones.
+
+```mermaid
+graph TD
+    A[Hardware Sensors] -->|ESP32 BLE| B(Flutter Mobile App)
+    B --> C{Edge AI Pipeline}
+    C -->|TFLite| D[ECG Arrhythmia CNN]
+    C -->|TFLite| E[Urine Colorimetry CNN]
+    C -->|Vosk| F[Speech-to-Text & NLP]
+    D --> G{Triage Integrator}
+    E --> G
+    F --> G
+    G --> H[MEWS Safety Override]
+    H -->|XGBoost Scaffold| I(Final Triage Color)
+    I -->|JSON Payload| J[(Local Hive DB)]
+    J -->|Network Restored| K[(Cloud Backend)]
+```
+
+## Tech Stack & ML Models
+- **Frontend & Orchestration:** Flutter / Dart (Cross-platform)
+- **Edge Inference Engine:** TensorFlow Lite (TFLite)
+- **Local Speech Recognition:** Vosk (Offline ASR)
+- **Hardware Integration:** `flutter_blue_plus` (BLE)
+- **AI/ML Pipeline:**
+  - **ECG CNN:** 1D Convolutional Neural Net for Arrhythmia detection.
+  - **Urine CNN:** MLP trained on normalized RGB colorimeter outputs.
+  - **NLP Extractor:** BERT embeddings with a bilingual (Hindi/English) fallback lexicon (`clinical_keywords.json`).
+  - **Triage Scaffolding:** Hard-coded decision boundaries derived from an XGBoost 3-class booster, combined with clinical MEWS override logic.
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Flutter SDK (v3.19.0+)
+- Android Studio or Xcode
+- An Android device (for BLE testing, iOS requires additional permissions)
+
+### Installation
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/anushkasrivastava21/raksha-dash.git
+   cd raksha-dash
+   ```
+2. **Install dependencies:**
+   ```bash
+   flutter pub get
+   ```
+3. **Run the App:**
+   ```bash
+   flutter run
+   ```
+
+### Running Tests
+To run the MEWS safety fallback and AI integration tests:
+```bash
+flutter analyze
+flutter test
+```
+
+---
+
 ## Existing Infrastructure Differences
 How Raksha compares to existing market solutions:
 - **Swasthya Slate:** Runs tests, but provides no urgency score or AI triage layer.
