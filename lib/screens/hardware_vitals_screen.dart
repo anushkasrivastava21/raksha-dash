@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/vitals_model.dart';
 import '../providers/triage_state.dart';
 import '../providers/triage_provider.dart';
+import '../patient_provider.dart';
 import '../services/ble_service.dart';
 import '../widgets/app_header.dart';
 import 'telemetry_sync_screen.dart';
@@ -69,7 +70,26 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     final payload = triageProvider.generateJsonPayload();
     final VitalsModel result = VitalsModel.fromJson(payload);
     
+    // MEWS SAFETY OVERRIDE
+    final mewsEngine = PatientProvider();
+    mewsEngine.updateVitals(
+      hr: result.ecgHr,
+      s: result.spo2,
+      temp: result.temperature,
+    );
+    final mewsResult = mewsEngine.evaluateMews();
+
     if (!context.mounted) return;
+
+    if (mewsResult["override"] == true && mewsResult["status"] == "RED") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MewsCriticalAlertScreen(reason: mewsResult["reason"]),
+        ),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
@@ -436,3 +456,59 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   }
 }
 
+
+class MewsCriticalAlertScreen extends StatelessWidget {
+  final String reason;
+
+  const MewsCriticalAlertScreen({super.key, required this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.red[900],
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 80),
+                const SizedBox(height: 24),
+                const Text(
+                  'CRITICAL MEWS ALERT',
+                  style: TextStyle(
+                    fontFamily: 'Space Mono',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  reason,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'Space Mono',
+                    fontSize: 18,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.red[900],
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  ),
+                  child: const Text('ACKNOWLEDGE & RETURN', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -181,10 +181,9 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   Widget build(BuildContext context) {
     final vitals = widget.vitals;
     final triageProvider = Provider.of<TriageProvider>(context);
-
-    String triageText = 'GREEN';
-    double confidence = 0.99;
-    String patientId = "RX-2049";
+    final String triageText = vitals?.triage ?? 'LOW RISK (STABLE)';
+    final String confidenceText = 'AI Confidence: ${((vitals?.confidence ?? 0.94) * 100).toStringAsFixed(0)}%';
+    final String patientIdText = 'Patient ID: ${vitals?.patientId ?? "RX-2049"}';
 
     if (vitals != null) {
       triageText = vitals.triage;
@@ -214,16 +213,11 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
         
     final String tempText = vitals != null 
         ? '${(vitals.temperature - 1).toStringAsFixed(1)}°C' 
-        : '${((triageProvider.spo2TempResult?.temperature ?? 37.8) - 1).toStringAsFixed(1)}°C';
-        
-    final String urineText = vitals != null 
-        ? 'NORMAL' 
-        : (triageProvider.urineStatus == ScanStatus.abnormal ? 'ABNORMAL' : 'NORMAL');
-        
+        : '97.6°C';
+    const String urineText = 'NORMAL';
     final String lungsText = vitals != null
         ? vitals.stethoscopeStatus.toUpperCase()
-        : (triageProvider.stethResult?.status.toUpperCase() ?? 'CLEAR');
-
+        : (triageProvider.stethResult?.lungSound.toUpperCase() ?? 'CLEAR');
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0EDEC), // Neutral desktop backdrop

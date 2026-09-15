@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Raksha-Sim (SwasthaGram)
 
-## Getting Started
+A portable, multi-sensory clinical triage system running AI directly on the edge. Designed to empower ASHA workers to run 6 critical diagnostic tests in under 3 minutes, fully offline, without requiring laboratory access.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## The Problem
+India faces a growing healthcare crisis at the grassroots level:
+- **1/4 of the population** lives with more than one chronic condition.
+- **No immediate diagnostics:** There is no viable way to check critical vitals or symptoms on the spot in rural areas.
+- **Overburdened Infrastructure:** A standard Primary Health Centre (PHC) is meant to serve 30,000 people, but currently serves over 34,000. 
+- **Inaccessibility:** On average, patients must travel 5.5 km to reach the nearest PHC.
+- **Manual Triage:** ASHA workers are forced to manually recommend care without access to diagnostic equipment or quantitative urgency metrics.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Our Solution
+We have built a portable, multi-sensory edge device that revolutionizes rural triage:
+- **Comprehensive:** Takes a patient's vitals (ECG, SpO2, Temperature, Urine Colorimetry) alongside local audio symptom inputs.
+- **100% Edge AI:** AI inference runs directly on the health worker's smartphone, eliminating the need for constant internet access.
+- **Secure Cloud Sync:** Securely stores patient records locally, and automatically uploads them to the cloud whenever connectivity is restored.
+- **Instant Triage:** Instantly categorizes patients into urgency tiers (RED, YELLOW, GREEN) using AI classification.
+- **Fail-safe Architecture:** Features a robust MEWS (Modified Early Warning Score) safety layer as a fallback to ensure critical patients are never under-triaged.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**The Result:** An ASHA worker in a remote village with no lab access can now run 6 diagnostics in just 3 minutes.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## What We Have Achieved (Current State)
+- **Hardware Integration:** All sensors are working individually and successfully communicating with the ESP32 microcontroller.
+- **BLE Connectivity:** Established a robust Bluetooth Low Energy (BLE) connection between the ESP32 and the smartphone app.
+- **Mobile Frontend:** Working, intuitive Flutter app optimized for field use.
+- **Cloud Infrastructure:** Fully functioning backend with integrated cloud storage for patient records.
+- **Safety Testing:** MEWS safety fallback algorithms evaluated and heavily unit-tested.
+- **AI Models:** 
+  - 6 CNN models developed for processing individual sensor streams (ECG Arrhythmia, Urine Severity).
+  - XGBoost model implemented for the final triage scoring.
+  - Basic BERT NLP integration with a fallback vocabulary lexicon for symptom extraction.
 
-To learn more about Next.js, take a look at the following resources:
+## 24-Hour Sprint Roadmap
+- **Seamless BLE:** Establish a bulletproof Bluetooth payload parser between the Flutter app and the ESP32.
+- **Speech-to-Text Pipeline:** Include offline STT embeddings (`vosk_flutter`) and improve the AI symptom extractor model.
+- **Edge Migration:** Successfully shift all computation from the Raspberry Pi entirely to the smartphone (Flutter/TFLite).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Future Vision
+- **Centralized Dashboard:** Create a live monitoring dashboard for local healthcare authorities and PHCs, granting doctors instant access to remote vitals.
+- **Outbreak Detection:** Utilize aggregate cloud data to automatically detect and flag regional disease outbreaks.
+- **Medical Authentication:** Undergo IEC standard testing and clinical trials to get our diagnostic readings medically authenticated.
+- **Continuous AI Improvement:** Train the models on larger, diverse datasets to push accuracy ceilings even higher.
+- **Pilot Deployment:** Launch a real-world pilot deployment with ASHA workers in the field.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Existing Infrastructure Differences
+How Raksha compares to existing market solutions:
+- **Swasthya Slate:** Runs tests, but provides no urgency score or AI triage layer.
+- **AYu Devices:** Only reads one signal (steth/ECG) and still requires a doctor to interpret the results.
+- **Swasthya Sahayak:** Captures vitals, but requires constant WiFi and is highly cost-inefficient.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> **Raksha** bridges the gap: highly affordable, multi-sensory, fully offline-capable, and immediately actionable.

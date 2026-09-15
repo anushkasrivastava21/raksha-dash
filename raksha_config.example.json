@@ -1,0 +1,11 @@
+{
+  "app":     { "log_level": "INFO" },
+  "dataset": { "url": "https://raw.githubusercontent.com/<org>/<repo>/main/esp32_payloads.json",
+               "timeout_s": 10, "retries": 3, "use_cache": true },
+  "ecg":     { "sample_rate_hz": 360, "bandpass_low_hz": 0.5, "bandpass_high_hz": 45,
+               "weights_path": "models/ecg_cnn.pt" },
+  "urine":   { "adc_max": 4095, "dark_amber_luma": 110, "hematuria_red_ratio": 1.35 },
+  "audio":   { "device": "cpu", "torch_threads": 2, "target_sample_rate": 16000,
+               "max_seconds": 30, "max_transcript_chars": 512 },
+  "triage":  { "model_path": "triage_xgboost.json", "symptom_red_boost": 0.45 }
+}
