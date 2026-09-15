@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/inference_service.dart';
 import '../services/mews_service.dart';
 import '../services/triage_scaffold.dart';
 import '../services/keyword_extractor.dart';
@@ -37,11 +38,15 @@ class EcgResult {
   final double heartRate; // BPM
   final String rhythm; // e.g. "Normal Sinus", "Atrial Fibrillation"
   final double qtInterval; // ms
+  /// Raw ADC sample floats from the BLE payload (up to 256 samples).
+  /// Used by InferenceService for arrhythmia CNN inference.
+  final List<double> rawSamples;
 
   const EcgResult({
     required this.heartRate,
     required this.rhythm,
     required this.qtInterval,
+    this.rawSamples = const [],
   });
 }
 
@@ -168,6 +173,15 @@ class TriageProvider extends ChangeNotifier {
 
   EcgResult? _ecgResult;
   EcgResult? get ecgResult => _ecgResult;
+
+  /// True once InferenceService confirms arrhythmia from the ECG waveform.
+  /// Defaults to false (non-critical) until inference completes successfully.
+  bool _isEcgAbnormal = false;
+  bool get isEcgAbnormal => _isEcgAbnormal;
+
+  /// CNN-derived urine severity: 1.0 = Normal, 2.0 = Abnormal.
+  /// Null until BLE urine RGB data arrives and inference runs.
+  double? _urineInferenceSeverity;
 
   Spo2TempResult? _spo2TempResult;
   Spo2TempResult? get spo2TempResult => _spo2TempResult;
@@ -303,12 +317,28 @@ class TriageProvider extends ChangeNotifier {
           break;
         case 'HR':
         case 'ECG':
+          // Parse raw waveform samples from BLE payload if present.
+          // The ESP32 firmware encodes them as a JSON array: {"hr":..., "samples":[...]}
+          List<double> ecgSamples = [];
+          if (data['samples'] is List) {
+            ecgSamples = (data['samples'] as List)
+                .map((v) => (v as num).toDouble())
+                .toList();
+          }
           _ecgResult = EcgResult(
             heartRate: (data['hr'] ?? 75.0).toDouble(),
             rhythm: data['rhythm'] ?? 'Normal Sinus',
             qtInterval: (data['qt'] ?? 400.0).toDouble(),
+            rawSamples: ecgSamples,
           );
           _ecgStatus = ScanStatus.clean;
+
+          // ── Async TFLite ECG Inference ────────────────────────────────
+          // Fire-and-forget; result stored in _isEcgAbnormal and propagated
+          // to the XGBoost rule table on the next triage payload generation.
+          if (ecgSamples.isNotEmpty) {
+            _runEcgInference(ecgSamples);
+          }
           break;
         case 'URINE':
           _urineResult = UrineResult(
@@ -318,6 +348,13 @@ class TriageProvider extends ChangeNotifier {
             glucose: data['glucose'] ?? 'Negative',
           );
           _urineStatus = ScanStatus.clean;
+
+          // ── Async TFLite Urine CNN Inference ──────────────────────────
+          // Run CNN over raw RGB if present; fall back to rule-based severity.
+          final rawRgbList = _urineResult!.rawRgb;
+          if (rawRgbList != null && rawRgbList.length >= 3) {
+            _runUrineInference(rawRgbList);
+          }
           break;
       }
       notifyListeners();
@@ -326,15 +363,40 @@ class TriageProvider extends ChangeNotifier {
     }
   }
 
+  // ── Async inference helpers ───────────────────────────────────────────────
+
+  /// Runs ECG arrhythmia inference and updates [_isEcgAbnormal].
+  Future<void> _runEcgInference(List<double> samples) async {
+    try {
+      await InferenceService().initialize();
+      final result = await InferenceService().runEcgInference(samples);
+      _isEcgAbnormal = result;
+      debugPrint('🫀 [TriageProvider] _isEcgAbnormal updated → $_isEcgAbnormal');
+      notifyListeners();
+    } catch (e, stack) {
+      // Strict safe default: do not surface error to user; log for debugging.
+      debugPrint('❌ [TriageProvider] ECG inference pipeline error: $e\n$stack');
+      _isEcgAbnormal = false;
+    }
+  }
+
+  /// Runs Urine CNN inference and updates [_urineInferenceSeverity].
+  Future<void> _runUrineInference(List<double> rgb) async {
+    try {
+      await InferenceService().initialize();
+      final severity = await InferenceService().runUrineInference(rgb);
+      _urineInferenceSeverity = severity;
+      debugPrint('🧪 [TriageProvider] _urineInferenceSeverity updated → $severity');
+      notifyListeners();
+    } catch (e, stack) {
+      debugPrint('❌ [TriageProvider] Urine inference pipeline error: $e\n$stack');
+      _urineInferenceSeverity = null;
+    }
+  }
+
   // ════════════════════════════════════════════════════════════════════════
   // AGGREGATE EVALUATION & NAVIGATION
   // ════════════════════════════════════════════════════════════════════════
-
-  bool get hasAnyAbnormal =>
-      _stethStatus == ScanStatus.abnormal ||
-      _ecgStatus == ScanStatus.abnormal ||
-      _spo2TempStatus == ScanStatus.abnormal ||
-      _urineStatus == ScanStatus.abnormal;
 
   bool get allTestsComplete =>
       _stethStatus != ScanStatus.initial &&
@@ -384,6 +446,37 @@ class TriageProvider extends ChangeNotifier {
         ? 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
         : _patientInfo.id;
 
+    // ── URINE SEVERITY ────────────────────────────────────────────────────
+    // Priority: CNN inference result → rule-based fallback → status-based fallback
+    double? liveUrineSeverity;
+    if (_urineInferenceSeverity != null) {
+      // ✅ CNN output from InferenceService (Anirudh's Urine CNN)
+      liveUrineSeverity = _urineInferenceSeverity;
+    } else if (_urineResult != null) {
+      // Fallback: rule-based derivation from strip markers (no CNN result yet)
+      double severity = 1.0;
+      if (_urineResult!.protein != 'Negative') {
+        severity += 0.5;
+      }
+      if (_urineResult!.glucose != 'Negative') {
+        severity += 0.5;
+      }
+      if (_urineResult!.color.toLowerCase() == 'red' ||
+          _urineResult!.color.toLowerCase() == 'dark brown') {
+        severity += 1.0;
+      }
+      liveUrineSeverity = severity;
+    } else {
+      liveUrineSeverity = _urineStatus == ScanStatus.abnormal ? 2.0 : 1.0;
+    }
+
+    // ── ECG ARRHYTHMIA ───────────────────────────────────────────────────
+    // _isEcgAbnormal is updated asynchronously by _runEcgInference() each
+    // time a full ECG BLE waveform packet is reassembled.
+    // When true, it boosts symptomKeywords to escalate triage toward YELLOW/RED.
+    final List<String> ecgDerivedKeywords =
+        _isEcgAbnormal ? ['arrhythmia_detected'] : [];
+
     // MEWS is computed from the same raw vitals used in generateVitalsJsonPayload
     // (same fallback chain) so both payloads agree on which numbers were used.
     final mews = mewsOverride(VitalsSnapshot(
@@ -393,12 +486,16 @@ class TriageProvider extends ChangeNotifier {
     ));
 
     // Compute ML-based triage from XGBoost rule table
+    // Merge ECG-derived arrhythmia keyword with any STT-extracted symptoms.
     final triageInputs = TriageInputs(
       ecgHr: (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble(),
       spo2: _spo2TempResult?.spo2.toDouble(),
       temperature: _spo2TempResult?.temperature,
-      urineSeverity: _urineStatus == ScanStatus.abnormal ? 2.0 : 1.0, 
-      symptomKeywords: KeywordExtractor.extractSymptoms(_patientTranscript),
+      urineSeverity: liveUrineSeverity,
+      symptomKeywords: [
+        ...KeywordExtractor.extractSymptoms(_patientTranscript),
+        ...ecgDerivedKeywords,  // Injects arrhythmia signal into rule table
+      ],
     );
     final mlTriage = evaluateTriage(triageInputs);
 
