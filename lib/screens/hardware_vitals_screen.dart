@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/vitals_model.dart';
 import '../providers/triage_state.dart';
-import '../services/raspi_api_service.dart';
+import '../providers/triage_provider.dart';
+import '../services/ble_service.dart';
 import '../widgets/app_header.dart';
 import 'telemetry_sync_screen.dart';
 import 'triage_result_screen.dart';
 
 /// Native Flutter implementation of Dashboard 1 (Empty State - RAW VITALS).
 /// Mobile-constrained layout matching original HTML/CSS design specification.
-class RakshaHardwareVitalsScreen extends StatelessWidget {
+class RakshaHardwareVitalsScreen extends StatefulWidget {
   final VoidCallback? onExecuteTriage;
 
   const RakshaHardwareVitalsScreen({
@@ -17,6 +18,11 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
     this.onExecuteTriage,
   });
 
+  @override
+  State<RakshaHardwareVitalsScreen> createState() => _RakshaHardwareVitalsScreenState();
+}
+
+class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen> {
   // Color constants matching Dashboard 1 HTML/CSS specification
   static const Color _surfaceContainerLow = Color(0xFFF6F3F2);
   static const Color _surfaceContainerLowest = Color(0xFFFFFFFF);
@@ -29,6 +35,21 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
   static const Color _completedBg = Color(0xFFDFF5E1);
   static const Color _completedGreen = Color(0xFF34A853);
 
+  String _rawBleData = "";
+  bool _isConnecting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    BleService().rawDataStream.listen((data) {
+      if (mounted) {
+        setState(() {
+          _rawBleData = data;
+        });
+      }
+    });
+  }
+
   void _navigateToTest(BuildContext context, VitalTestType type) {
     Navigator.push(
       context,
@@ -39,12 +60,15 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
   }
 
   Future<void> _handleExecuteTriage(BuildContext context) async {
-    if (onExecuteTriage != null) {
-      onExecuteTriage!();
+    if (widget.onExecuteTriage != null) {
+      widget.onExecuteTriage!();
       return;
     }
 
-    final VitalsModel? result = await RaspiApiService.getTriageResult();
+    final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+    final payload = triageProvider.generateJsonPayload();
+    final VitalsModel result = VitalsModel.fromJson(payload);
+    
     if (!context.mounted) return;
 
     Navigator.push(
@@ -53,6 +77,17 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
         builder: (context) => TriageResultScreen(vitals: result),
       ),
     );
+  }
+
+  Future<void> _toggleBleConnection() async {
+    final ble = BleService();
+    if (ble.isConnected) {
+      await ble.disconnect();
+    } else {
+      setState(() { _isConnecting = true; });
+      await ble.connectToEsp32();
+      setState(() { _isConnecting = false; });
+    }
   }
 
   @override
@@ -72,6 +107,54 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
                 children: [
                   // TOP APP BAR HEADER
                   const AppHeader(),
+
+                  // BLE Connection Banner (PRD requirement: BLE connection established)
+                  StreamBuilder<bool>(
+                    stream: BleService().connectionStateStream,
+                    initialData: BleService().isConnected,
+                    builder: (context, snapshot) {
+                      final isConnected = snapshot.data ?? false;
+                      return Container(
+                        color: isConnected ? _completedBg : const Color(0xFFFDE8E8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                              color: isConnected ? _completedGreen : Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isConnected ? "BLE Connected to ESP32" : "BLE Disconnected",
+                                style: TextStyle(
+                                  fontFamily: 'Space Mono',
+                                  color: isConnected ? _completedGreen : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            if (_isConnecting)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              TextButton(
+                                onPressed: _toggleBleConnection,
+                                child: Text(
+                                  isConnected ? "DISCONNECT" : "CONNECT",
+                                  style: const TextStyle(fontFamily: 'Space Mono', fontSize: 12),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }
+                  ),
 
                   // MAIN CONTENT AREA
                   Expanded(
@@ -99,6 +182,7 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
 
                           // GRID LAYOUT (Vitals Cards)
                           Expanded(
+                            flex: 3,
                             child: Column(
                               children: [
                                 // Row 1: SPO2 & HR
@@ -170,6 +254,31 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
                               ],
                             ),
                           ),
+
+                          // Raw bytes display (PRD requirement)
+                          if (_rawBleData.isNotEmpty)
+                            Expanded(
+                              flex: 1,
+                              child: Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                width: double.infinity,
+                                child: SingleChildScrollView(
+                                  child: Text(
+                                    'RAW BLE BYTES:\n$_rawBleData',
+                                    style: const TextStyle(
+                                      fontFamily: 'Space Mono',
+                                      color: Colors.greenAccent,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
 
                           // MIC ACTION BUTTON (88px x 88px)
                           const SizedBox(height: 10),
@@ -326,3 +435,4 @@ class RakshaHardwareVitalsScreen extends StatelessWidget {
     );
   }
 }
+

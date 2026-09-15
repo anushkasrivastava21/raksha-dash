@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -264,6 +266,55 @@ class TriageProvider extends ChangeNotifier {
     _urineStatus = ScanStatus.initial;
     _urineResult = null;
     notifyListeners();
+  }
+
+  // Parses incoming BLE JSON and updates state directly
+  void updateFromBleJson(String sensorCode, String jsonPayload) {
+    try {
+      final Map<String, dynamic> data = jsonDecode(jsonPayload);
+      
+      switch (sensorCode) {
+        case 'SPO2':
+        case 'MAX30102':
+          _spo2TempResult = Spo2TempResult(
+            spo2: (data['spo2'] ?? 98).toInt(),
+            temperature: _spo2TempResult?.temperature ?? 36.5,
+            heartRate: (data['hr'] ?? 72).toInt(),
+          );
+          _spo2TempStatus = ScanStatus.clean;
+          break;
+        case 'TEMP':
+        case 'MLX90614':
+          _spo2TempResult = Spo2TempResult(
+            spo2: _spo2TempResult?.spo2 ?? 98,
+            temperature: (data['temp'] ?? 36.5).toDouble(),
+            heartRate: _spo2TempResult?.heartRate ?? 72,
+          );
+          _spo2TempStatus = ScanStatus.clean;
+          break;
+        case 'HR':
+        case 'ECG':
+          _ecgResult = EcgResult(
+            heartRate: (data['hr'] ?? 75.0).toDouble(),
+            rhythm: data['rhythm'] ?? 'Normal Sinus',
+            qtInterval: (data['qt'] ?? 400.0).toDouble(),
+          );
+          _ecgStatus = ScanStatus.clean;
+          break;
+        case 'URINE':
+          _urineResult = UrineResult(
+            color: data['color'] ?? 'Yellow',
+            ph: (data['ph'] ?? 6.5).toDouble(),
+            protein: data['protein'] ?? 'Negative',
+            glucose: data['glucose'] ?? 'Negative',
+          );
+          _urineStatus = ScanStatus.clean;
+          break;
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error parsing BLE JSON in TriageProvider: $e');
+    }
   }
 
   // ════════════════════════════════════════════════════════════════════════

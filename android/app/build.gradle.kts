@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.raksha_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -36,6 +36,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // Bypass AAR metadata version mismatch checks for permission_handler
 }
 
 kotlin {

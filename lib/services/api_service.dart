@@ -6,7 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'vitals_model.dart';
+import '../config/app_config.dart';
+import '../models/vitals_model.dart';
 
 /// API Service for Render backend hardware telemetry endpoint
 class RenderApiService {

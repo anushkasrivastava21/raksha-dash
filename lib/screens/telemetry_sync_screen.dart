@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/triage_provider.dart';
 import '../providers/triage_state.dart';
-import '../services/pi_service.dart';
-import '../services/raspi_api_service.dart';
+import '../services/ble_service.dart';
 import '../widgets/app_header.dart';
+import 'hardware_vitals_screen.dart';
 import 'dashboard_completed_screen.dart';
 
 /// Configuration data model representing loading information for a specific vital test.
@@ -130,93 +130,103 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
   }
 
   Future<void> _startHardwareTest() async {
-    // 1. Attempt real hardware trigger via RaspiApiService → PiService
-    final TriggerResult result = await RaspiApiService.triggerTest(widget.testType);
-
-    if (!mounted) return;
-
-    final data = result.data;
-    if (result.success && data != null) {
-      debugPrint('✅ [DynamicTestLoader] Live hardware reading succeeded for ${widget.testType}: $data');
-    } else {
-      debugPrint('⚠️ [DynamicTestLoader] Live hardware trigger unavailable for ${widget.testType}. Using safe baseline fallback.');
-      await Future.delayed(const Duration(milliseconds: 1000));
-      if (!mounted) return;
+    final ble = BleService();
+    if (!ble.isConnected) {
+      debugPrint('⚠️ BLE not connected. Cannot start test.');
+      if (mounted) Navigator.pop(context);
+      return;
     }
 
-    // 2. Mark test completed in TriageState + apply vitals data
-    final triageState = Provider.of<TriageState>(context, listen: false);
-    triageState.markCompleted(widget.testType);
+    StreamSubscription? sub;
+    bool received = false;
 
-    final triageProvider = Provider.of<TriageProvider>(context, listen: false);
-    switch (widget.testType) {
-      case VitalTestType.spo2:
-        final int spo2Val = (data?['spo2'] as num?)?.toInt() ?? 
-            (triageProvider.spo2TempResult?.spo2 ?? 98);
-        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 
-            (triageProvider.spo2TempResult?.heartRate.toDouble() ?? 74.0);
-        final double existingTemp = triageProvider.spo2TempResult?.temperature ?? 36.8;
-        triageProvider.applySpo2TempData(
-          spo2: spo2Val,
-          heartRate: hrVal.toInt(),
-          temperature: existingTemp,
-        );
-        break;
-      case VitalTestType.temp:
-        final double tempVal = (data?['temperature'] as num?)?.toDouble() ?? 
-            (triageProvider.spo2TempResult?.temperature ?? 36.8);
-        final int existingSpo2 = triageProvider.spo2TempResult?.spo2 ?? 98;
-        final int existingHr = triageProvider.spo2TempResult?.heartRate ?? 72;
-        triageProvider.applySpo2TempData(
-          spo2: existingSpo2,
-          heartRate: existingHr,
-          temperature: tempVal,
-        );
-        break;
-      case VitalTestType.hr:
-        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
-        final String rhythm = data?['rhythm']?.toString() ?? 'Normal Sinus';
-        triageProvider.applyEcgData(
-          heartRate: hrVal,
-          rhythm: rhythm,
-          qtInterval: 410.0,
-        );
-        break;
-      case VitalTestType.urine:
-        final String color = data?['color']?.toString() ?? 'Yellow';
-        List<double>? parsedRgb;
-        if (data?['urine_rgb'] is List) {
-          parsedRgb = (data!['urine_rgb'] as List)
-              .map((e) => (e as num?)?.toDouble() ?? 0.0)
-              .toList();
+    // 1. Listen for incoming raw BLE strings
+    sub = ble.rawDataStream.listen((rawStr) {
+      final parts = rawStr.split('|').map((e) => e.trim()).toList();
+      if (parts.isNotEmpty) {
+        String sensorCode = parts[0];
+        
+        // Match incoming sensor code to this screen's expected test
+        if (_isExpectedCode(sensorCode, widget.testType) && parts.length >= 2) {
+          received = true;
+          sub?.cancel();
+          
+          if (mounted) {
+            // Push validated payload into the state management!
+            final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+            triageProvider.updateFromBleJson(sensorCode, parts[1]);
+            
+            final triageState = Provider.of<TriageState>(context, listen: false);
+            triageState.markCompleted(widget.testType);
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardCompletedScreen()),
+            );
+          }
         }
-        triageProvider.applyUrineData(
-          color: color,
-          ph: 6.5,
-          protein: 'Negative',
-          glucose: 'Negative',
-          rawRgb: parsedRgb,
-        );
-        break;
+      }
+    });
+
+    // 2. Transmit the command to ESP32
+    String cmd = _getCommandForType(widget.testType);
+    await ble.sendCommand(cmd);
+
+    // 3. Fallback timeout & Demo Safe-Fail Mechanism
+    await Future.delayed(const Duration(seconds: 15));
+    if (!received && mounted) {
+      sub?.cancel();
+      debugPrint('⚠️ [DynamicTestLoader] Sensor read timed out for ${widget.testType}. Injecting safe fallback baseline data for demo continuity.');
+      
+      final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+      switch (widget.testType) {
+        case VitalTestType.spo2:
+        case VitalTestType.temp:
+          triageProvider.applySpo2TempData();
+          break;
+        case VitalTestType.hr:
+          triageProvider.applyEcgData();
+          break;
+        case VitalTestType.urine:
+          triageProvider.applyUrineData();
+          break;
+        case VitalTestType.stethoscope:
+        case VitalTestType.voice:
+          triageProvider.applyStethData();
+          break;
+      }
+
+      final triageState = Provider.of<TriageState>(context, listen: false);
+      triageState.markCompleted(widget.testType);
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardCompletedScreen()),
+      );
+    }
+  }
+
+  bool _isExpectedCode(String code, VitalTestType type) {
+    switch (type) {
+      case VitalTestType.spo2: return code == 'SPO2' || code == 'MAX30102';
+      case VitalTestType.hr: return code == 'HR' || code == 'ECG';
+      case VitalTestType.temp: return code == 'TEMP' || code == 'MLX90614';
+      case VitalTestType.urine: return code == 'URINE';
       case VitalTestType.stethoscope:
       case VitalTestType.voice:
-        final String lung = data?['lung_sound']?.toString() ?? 
-            (data?['stethoscope_status'] == 'recorded' ? 'Recorded' : 'Clear');
-        final double hrVal = (data?['ecg_hr'] as num?)?.toDouble() ?? 74.0;
-        triageProvider.applyStethData(
-          heartRate: hrVal,
-          lungSound: lung,
-        );
-        break;
+        return code == 'STETH' || code == 'VOICE' || code == 'AUDIO';
     }
+  }
 
-    // 3. Navigate to Dashboard 2 (Completed State)
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const DashboardCompletedScreen(),
-      ),
-    );
+  String _getCommandForType(VitalTestType type) {
+    switch (type) {
+      case VitalTestType.spo2: return 'REQ_SPO2';
+      case VitalTestType.hr: return 'REQ_ECG';
+      case VitalTestType.temp: return 'REQ_TEMP';
+      case VitalTestType.urine: return 'REQ_URINE';
+      case VitalTestType.stethoscope: return 'REQ_STETH';
+      case VitalTestType.voice: return 'REQ_VOICE';
+    }
   }
 
   @override

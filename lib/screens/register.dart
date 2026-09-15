@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/raspi_api_service.dart';
 import '../widgets/app_header.dart';
 import 'hardware_vitals_screen.dart';
 
@@ -370,7 +369,6 @@ class _RakshaPatientRegistrationScreenState
           height: 56.0,
           child: ElevatedButton(
             onPressed: () {
-              RaspiApiService.initSession(patientId: widget.patientId);
               if (widget.onProceedPressed != null) {
                 widget.onProceedPressed!();
               } else {
