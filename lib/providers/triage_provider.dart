@@ -61,12 +61,14 @@ class UrineResult {
   final double ph;
   final String protein; // "Negative", "Trace", "Positive"
   final String glucose; // "Negative", "Trace", "Positive"
+  final List<double>? rawRgb;
 
   const UrineResult({
     required this.color,
     required this.ph,
     required this.protein,
     required this.glucose,
+    this.rawRgb,
   });
 }
 
@@ -244,6 +246,7 @@ class TriageProvider extends ChangeNotifier {
     double ph = 6.5,
     String protein = 'Negative',
     String glucose = 'Negative',
+    List<double>? rawRgb,
     ScanStatus status = ScanStatus.clean,
   }) {
     _urineResult = UrineResult(
@@ -251,6 +254,7 @@ class TriageProvider extends ChangeNotifier {
       ph: ph,
       protein: protein,
       glucose: glucose,
+      rawRgb: rawRgb,
     );
     _urineStatus = status;
     notifyListeners();
@@ -308,7 +312,7 @@ class TriageProvider extends ChangeNotifier {
       "ecg_hr": (_ecgResult?.heartRate ?? _stethResult?.heartRate ?? 72.0).toDouble(),
       "spo2": (_spo2TempResult?.spo2 ?? 98).toDouble(),
       "temperature": (_spo2TempResult?.temperature ?? 36.8).toDouble(),
-      "urine_rgb": _getUrineRgb(_urineResult?.color),
+      "urine_rgb": _urineResult?.rawRgb ?? _getUrineRgb(_urineResult?.color),
       "patient_speech_text":
           "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
     };
