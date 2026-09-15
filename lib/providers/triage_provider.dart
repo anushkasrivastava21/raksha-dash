@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../services/mews_service.dart'; 
+import '../services/mews_service.dart';
+import '../services/triage_scaffold.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 // ENUMS
 // ──────────────────────────────────────────────────────────────────────────────
@@ -331,11 +332,21 @@ class TriageProvider extends ChangeNotifier {
       temperature: (_spo2TempResult?.temperature ?? 36.8).toDouble(),
     ));
 
-    // MEWS RED/YELLOW always wins and overrides the per-step ScanStatus signal —
+    // Compute ML-based triage from XGBoost rule table
+    final triageInputs = TriageInputs(
+      ecgHr: (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble(),
+      spo2: _spo2TempResult?.spo2.toDouble(),
+      temperature: _spo2TempResult?.temperature,
+      urineSeverity: _urineStatus == ScanStatus.abnormal ? 2.0 : 1.0, 
+      symptomKeywords: [], // TODO: integrate Vosk offline keywords here
+    );
+    final mlTriage = evaluateTriage(triageInputs);
+
+    // MEWS RED/YELLOW always wins and overrides the ML base signal —
     // this is Finding 2 from the PRD: the override must be the only thing that
     // reaches the cloud/dashboard when it fires.
-    final String triageColor = mews.override ? mews.displayColor! : (hasAnyAbnormal ? "Yellow" : "Green");
-    final double confidence = mews.override ? 0.99 : (hasAnyAbnormal ? 0.88 : 0.96);
+    final String triageColor = mews.override ? mews.displayColor! : mlTriage.triageColor;
+    final double confidence = mews.override ? 0.99 : mlTriage.confidence;
 
     return {
       "patient_id": activeId,
