@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/triage_provider.dart';
 import '../models/vitals_model.dart';
 import '../providers/triage_state.dart';
-import '../services/raspi_api_service.dart';
 import '../widgets/app_header.dart';
 import 'telemetry_sync_screen.dart';
 import 'triage_result_screen.dart';
@@ -47,7 +47,10 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
     });
 
     try {
-      final VitalsModel? result = await RaspiApiService.getTriageResult();
+      final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+      final payload = triageProvider.generateJsonPayload();
+      final VitalsModel result = VitalsModel.fromJson(payload);
+
       if (!mounted) return;
 
       Navigator.push(
