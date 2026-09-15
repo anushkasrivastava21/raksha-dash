@@ -28,15 +28,15 @@ class MewsResult {
     required this.reason,
   });
 
-  /// Display-cased triage color ("Red" | "Yellow"), or null if no override.
+  /// Display-cased triage color ("RED" | "YELLOW"), or null if no override.
   /// This is the ONLY place raw "RED"/"YELLOW" casing should ever be
   /// converted -- nothing downstream should re-implement this mapping.
   String? get displayColor {
     switch (status) {
       case "RED":
-        return "Red";
+        return "RED";
       case "YELLOW":
-        return "Yellow";
+        return "YELLOW";
       default:
         return null;
     }

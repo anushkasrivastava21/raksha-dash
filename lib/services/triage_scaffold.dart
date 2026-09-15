@@ -20,7 +20,7 @@ class TriageInputs {
 }
 
 class TriageResult {
-  final String triageColor; // "Green" | "Yellow" | "Red"
+  final String triageColor; // "GREEN" | "YELLOW" | "RED"
   final double confidence; // 0.0-1.0
 
   const TriageResult(this.triageColor, this.confidence);
@@ -32,7 +32,7 @@ TriageResult evaluateTriage(TriageInputs inputs) {
   if ((inputs.ecgHr != null && (inputs.ecgHr! < 50 || inputs.ecgHr! > 140)) ||
       (inputs.spo2 != null && inputs.spo2! < 85) ||
       (inputs.temperature != null && (inputs.temperature! < 34.0 || inputs.temperature! > 40.0))) {
-    return const TriageResult("Red", 0.95);
+    return const TriageResult("RED", 0.95);
   }
 
   // Warning thresholds based on provided min/max ranges (Yellow)
@@ -59,9 +59,9 @@ TriageResult evaluateTriage(TriageInputs inputs) {
   }
 
   if (isYellow) {
-    return const TriageResult("Yellow", 0.85);
+    return const TriageResult("YELLOW", 0.85);
   }
 
   // All within normal bounds (Green)
-  return const TriageResult("Green", 0.95);
+  return const TriageResult("GREEN", 0.95);
 }
