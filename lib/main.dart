@@ -35,6 +35,11 @@ Future<void> main() async {
   await requestBlePermissions();
 
   // Attempt to flush offline cache in the background
+  // Using ignore to prevent linter errors on newer SDKs if we don't await,
+  // but since it's quick to return if empty, we can just await it.
+  // Actually, to not block UI thread on timeout, we will not await it,
+  // and use ignore: discarded_futures just in case.
+  // ignore: discarded_futures, unawaited_futures
   ApiService.flushOfflineCache();
 
   final prefs = await SharedPreferences.getInstance();
