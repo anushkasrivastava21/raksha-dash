@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/triage_scaffold.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // ENUMS
@@ -321,12 +322,6 @@ class TriageProvider extends ChangeNotifier {
   // AGGREGATE EVALUATION & NAVIGATION
   // ════════════════════════════════════════════════════════════════════════
 
-  bool get hasAnyAbnormal =>
-      _stethStatus == ScanStatus.abnormal ||
-      _ecgStatus == ScanStatus.abnormal ||
-      _spo2TempStatus == ScanStatus.abnormal ||
-      _urineStatus == ScanStatus.abnormal;
-
   bool get allTestsComplete =>
       _stethStatus != ScanStatus.initial &&
       _ecgStatus != ScanStatus.initial &&
@@ -373,11 +368,57 @@ class TriageProvider extends ChangeNotifier {
     final String activeId = (_patientInfo.id.isEmpty || _patientInfo.id == 'PT-0000' || _patientInfo.id == 'PT-0001')
         ? 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
         : _patientInfo.id;
+
+    // ── LIVE BLE SENSOR INPUTS ─────────────────────────────────────────────
+    final double? liveEcgHr =
+        (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble();
+    final double? liveSpo2 = (_spo2TempResult?.spo2)?.toDouble();
+    final double? liveTemp = _spo2TempResult?.temperature;
+
+    // ── URINE SEVERITY DERIVATION ──────────────────────────────────────────
+    // 1.0 = Normal. Increment for each abnormal strip marker.
+    // TODO(ecg-integration): Replace with real urine-strip severity from
+    // hardware once Anirudh's urine-severity float is available on the BLE payload.
+    double? liveUrineSeverity;
+    if (_urineResult != null) {
+      double severity = 1.0;
+      if (_urineResult!.protein != 'Negative') severity += 0.5;
+      if (_urineResult!.glucose != 'Negative') severity += 0.5;
+      if (_urineResult!.color.toLowerCase() == 'red' ||
+          _urineResult!.color.toLowerCase() == 'dark brown') severity += 1.0;
+      liveUrineSeverity = severity;
+    }
+
+    // ── PENDING INTEGRATIONS — STRICT PLACEHOLDERS ────────────────────────
+    // DO NOT remove or unwrap these until the corresponding pipeline is live.
+
+    // PLACEHOLDER: ECG abnormality flag (Vaibhavi's ECG classifier output).
+    // TODO(ecg-integration): Wire real isEcgAbnormal from EcgResult once
+    // the on-device TFLite ECG model is integrated.
+    // ignore: unused_local_variable
+    final bool isEcgAbnormal = false;
+
+    // PLACEHOLDER: Spoken symptom keywords extracted by STT pipeline.
+    // TODO(stt-integration): Replace with parsed keywords from the Speech-to-Text
+    // NLP extractor once the voice module is wired to TriageProvider.
+    final List<String> symptoms = [];
+
+    // ── XGBoost RULE TABLE EVALUATION ────────────────────────────────────
+    final TriageResult result = evaluateTriage(
+      TriageInputs(
+        ecgHr: liveEcgHr,
+        spo2: liveSpo2,
+        temperature: liveTemp,
+        urineSeverity: liveUrineSeverity,
+        symptomKeywords: symptoms,
+      ),
+    );
+
     return {
       "patient_id": activeId,
       "timestamp": DateTime.now().toIso8601String(),
-      "triage": hasAnyAbnormal ? "RED" : "GREEN",
-      "confidence": hasAnyAbnormal ? 0.88 : 0.96,
+      "triage": result.triageColor,       // "RED" | "YELLOW" | "GREEN"
+      "confidence": result.confidence,    // 0.0 – 1.0
     };
   }
 
