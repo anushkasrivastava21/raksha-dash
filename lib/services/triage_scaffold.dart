@@ -3,7 +3,7 @@
 // Note: This uses standard boundary ranges since the full decision tree
 // was not provided. Values outside these bounds trigger Yellow/Red.
 
-import '../triage/xgb_triage_model.dart';
+import 'xgb_triage_model.dart';
 
 class TriageInputs {
   final double? ecgHr; // Heart Rate (BPM)
