@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 // Adjust the package name to match pubspec.yaml if it differs.
-import 'package:raksha_dash/triage/xgb_triage_model.dart';
+import 'package:raksha_app/triage/xgb_triage_model.dart';
 
 void main() {
   final fixture = jsonDecode(
