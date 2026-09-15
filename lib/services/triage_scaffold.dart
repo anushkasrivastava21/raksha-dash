@@ -3,7 +3,7 @@
 // Note: This uses standard boundary ranges since the full decision tree
 // was not provided. Values outside these bounds trigger Yellow/Red.
 
-import 'xgboost_rules.dart';
+import '../../experiment_MED/dart_out/lib/triage/xgb_triage_model.dart';
 
 class TriageInputs {
   final double? ecgHr; // Heart Rate (BPM)
@@ -37,32 +37,21 @@ TriageResult evaluateTriage(TriageInputs inputs) {
     return const TriageResult("RED", 0.95);
   }
 
-  // Construct features map for XGBoost
-  Map<String, double> features = {};
-  if (inputs.ecgHr != null) features["ecg_hr"] = inputs.ecgHr!;
-  if (inputs.spo2 != null) features["spo2"] = inputs.spo2!;
-  if (inputs.temperature != null) features["temperature"] = inputs.temperature!;
-  if (inputs.urineSeverity != null) features["urine_severity"] = inputs.urineSeverity!;
+  // Construct features array for XGBoost: ['ecg_hr', 'bp_sys', 'bp_dia', 'spo2', 'temperature', 'urine_severity']
+  List<double> features = [
+    inputs.ecgHr ?? double.nan,
+    double.nan, // bp_sys missing
+    double.nan, // bp_dia missing
+    inputs.spo2 ?? double.nan,
+    inputs.temperature ?? double.nan,
+    inputs.urineSeverity ?? double.nan,
+  ];
 
-  // Predict using native Dart XGBoost engine
-  List<double> probs = XgbModel.predict(features);
+  // Predict using the official generated Dart XGBoost engine
+  TriageProbs probs = predictTriage(features);
 
-  // Map highest probability to class:
-  // 1 -> GREEN (Normal)
-  // 0 -> YELLOW (Warning)
-  // 2 -> RED (Critical)
-  int bestClass = 0;
-  double bestProb = probs[0];
-  for (int i = 1; i < probs.length; i++) {
-    if (probs[i] > bestProb) {
-      bestProb = probs[i];
-      bestClass = i;
-    }
-  }
-
-  String color = "YELLOW";
-  if (bestClass == 1) color = "GREEN";
-  if (bestClass == 2) color = "RED";
+  String color = probs.label.toUpperCase(); // "GREEN", "YELLOW", "RED"
+  double bestProb = probs.probs[probs.argmax];
 
   // Symptom keyword upgrade logic (since XGBoost doesn't use symptom flags natively)
   if (color == "GREEN" && inputs.symptomKeywords.isNotEmpty) {
