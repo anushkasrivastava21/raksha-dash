@@ -173,8 +173,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
     final String spo2Text = '${vitals?.spo2.toStringAsFixed(0) ?? "98"}%';
     final String hrText = '${vitals?.ecgHr.toStringAsFixed(0) ?? "72"} BPM';
     final String tempText = vitals != null 
-        ? '${(vitals.temperature - 1).toStringAsFixed(1)}°F' 
-        : '97.6°F';
+        ? '${(vitals.temperature - 1).toStringAsFixed(1)}°C' 
+        : '97.6°C';
     const String urineText = 'NORMAL';
     final String lungsText = (vitals?.stethoscopeStatus ?? 'CLEAR').toUpperCase();
 
