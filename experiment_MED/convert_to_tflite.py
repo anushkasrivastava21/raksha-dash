@@ -3,7 +3,7 @@
 Conversion paths (PyTorch-free — uses Keras directly):
     ECG_CNN       : Keras .keras → TFLite
     Urine_CNN     : Keras .keras → TFLite
-    XGBoost Triage: XGBoost → Keras surrogate → TFLite
+    XGBoost Triage: exact rule table + Dart (export_triage_rules.py)
 
 Prerequisites:
     python train_dummy_models.py          # creates model weights
@@ -101,87 +101,19 @@ def convert_urine() -> Path:
 
 
 # =========================================================================== #
-#  3. XGBoost Triage → Keras surrogate → TFLite
+#  3. XGBoost Triage -> NOT TFLite (PRD §0). Exact rule table + Dart instead.
 # =========================================================================== #
 def convert_triage() -> Path:
-    """Convert XGBoost triage model to TFLite via a Keras surrogate."""
-    import tensorflow as tf
-    import xgboost as xgb
-
-    log.info("=" * 60)
-    log.info("Converting XGBoost Triage → Keras surrogate → TFLite")
-    log.info("=" * 60)
-
-    model_path = MODELS_DIR / "triage_xgboost.json"
-    if not model_path.is_file():
-        raise FileNotFoundError(
-            f"XGBoost model not found at {model_path}. Run train_dummy_models.py first."
-        )
-
-    booster = xgb.Booster()
-    booster.load_model(str(model_path))
-
-    # Generate large synthetic dataset for surrogate training
-    rng = np.random.default_rng(123)
-    N = 5000
-    X_train = np.column_stack([
-        rng.uniform(40, 160, N),   # ecg_hr
-        rng.uniform(70, 220, N),   # bp_sys
-        rng.uniform(30, 140, N),   # bp_dia
-        rng.uniform(75, 100, N),   # spo2
-        rng.uniform(34, 43, N),    # temperature
-        rng.integers(0, 2, N),     # urine_severity
-    ]).astype(np.float32)
-
-    # Get XGBoost predictions as soft labels
-    dmatrix = xgb.DMatrix(
-        X_train,
-        feature_names=["ecg_hr", "bp_sys", "bp_dia", "spo2", "temperature", "urine_severity"],
-    )
-    y_soft = np.array(booster.predict(dmatrix), dtype=np.float32)  # (N, 3) probs
-
-    # Build Keras surrogate
-    surrogate = tf.keras.Sequential([
-        tf.keras.layers.Input(shape=(TRIAGE_INPUT_DIM,)),
-        tf.keras.layers.Dense(32, activation="relu"),
-        tf.keras.layers.Dense(16, activation="relu"),
-        tf.keras.layers.Dense(3, activation="softmax"),
-    ], name="Triage_Surrogate")
-
-    surrogate.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-        loss="categorical_crossentropy",
-        metrics=["accuracy"],
-    )
-
-    log.info("Training Keras surrogate on %d XGBoost-labelled samples...", N)
-    surrogate.fit(
-        X_train, y_soft,
-        epochs=50,
-        batch_size=64,
-        verbose=1,
-        validation_split=0.1,
-    )
-
-    # Evaluate surrogate fidelity
-    y_pred = surrogate.predict(X_train, verbose=0)
-    agreement = np.mean(np.argmax(y_pred, axis=1) == np.argmax(y_soft, axis=1))
-    log.info("Surrogate-XGBoost class agreement: %.1f%%", agreement * 100)
-
-    # Convert to TFLite
-    converter = tf.lite.TFLiteConverter.from_keras_model(surrogate)
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.target_spec.supported_types = [tf.float32]
-    tflite_model = converter.convert()
-
-    tflite_path = MODELS_DIR / "triage_model.tflite"
-    tflite_path.write_bytes(tflite_model)
-    log.info("Triage TFLite saved: %s (%d bytes)", tflite_path, len(tflite_model))
-
-    # Verify
-    test_input = X_train[:1].astype(np.float32)
-    _verify_tflite(tflite_path, test_input, surrogate.predict(test_input, verbose=0), "Triage")
-    return tflite_path
+    """The old Keras surrogate was (a) an approximation and (b) fitted to the
+    dummy booster in models/, not the trained ./triage_xgboost.json."""
+    import subprocess
+    import sys
+    from config import get_config
+    out = MODELS_DIR / "triage_rules.json"
+    subprocess.run([sys.executable, str(BASE_DIR / "export_triage_rules.py"),
+                    "--model", str(get_config().triage.model_path), "--out", str(out)],
+                   check=True)
+    return out
 
 
 # =========================================================================== #

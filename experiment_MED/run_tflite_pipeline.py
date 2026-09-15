@@ -55,7 +55,7 @@ class PipelineConfig:
     rgb_max: float = 255.0
 
     # Triage
-    triage_tflite: Path = MODELS_DIR / "triage_model.tflite"
+    triage_model_json: Path = BASE_DIR / "triage_xgboost.json"   # trained booster
     class_labels: tuple = ("Green", "Yellow", "Red")
 
     # Escalation rules (from config.py TriageConfig)
@@ -272,8 +272,11 @@ class RakshaTFLitePipeline:
         log.info("Initialising Raksha TFLite Pipeline...")
         self.ecg_model = TFLiteModel(CFG.ecg_tflite, "ECG_CNN")
         self.urine_model = TFLiteModel(CFG.urine_tflite, "Urine_CNN")
-        self.triage_model = TFLiteModel(CFG.triage_tflite, "Triage")
-        log.info("All 3 TFLite models loaded successfully.\n")
+        from export_triage_rules import load_rule_model
+        if not CFG.triage_model_json.is_file():
+            raise FileNotFoundError(f"Trained triage model missing: {CFG.triage_model_json}")
+        self.triage_model = load_rule_model(CFG.triage_model_json)   # exact, not a surrogate
+        log.info("ECG + urine TFLite and exact XGBoost rule table loaded.\n")
 
     # ----- ECG inference -------------------------------------------------- #
     def classify_ecg(self, raw_ecg: np.ndarray) -> str:
@@ -322,8 +325,7 @@ class RakshaTFLitePipeline:
     # ----- Triage inference ----------------------------------------------- #
     def classify_triage(self, features: np.ndarray) -> np.ndarray:
         """6 vital-sign features → 3-class probabilities."""
-        tensor = features.reshape(1, -1).astype(np.float32)
-        return self.triage_model.predict(tensor)[0]
+        return self.triage_model.predict_proba(features.astype(np.float32))
 
     # ----- Escalation rules (from triage_integrator.py) ------------------- #
     @staticmethod
