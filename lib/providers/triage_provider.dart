@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/mews_service.dart';
 import '../services/triage_scaffold.dart';
+import '../services/keyword_extractor.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 // ENUMS
 // ──────────────────────────────────────────────────────────────────────────────
@@ -173,6 +174,14 @@ class TriageProvider extends ChangeNotifier {
   UrineResult? _urineResult;
   UrineResult? get urineResult => _urineResult;
 
+  String _patientTranscript = "";
+  String get patientTranscript => _patientTranscript;
+
+  void setPatientTranscript(String transcript) {
+    _patientTranscript = transcript;
+    notifyListeners();
+  }
+
   // ════════════════════════════════════════════════════════════════════════
   // HARDWARE DATA APPLIERS (Direct Hardware Telemetry Ingestion)
   // ════════════════════════════════════════════════════════════════════════
@@ -314,8 +323,9 @@ class TriageProvider extends ChangeNotifier {
       "spo2": (_spo2TempResult?.spo2 ?? 98).toDouble(),
       "temperature": (_spo2TempResult?.temperature ?? 36.8).toDouble(),
       "urine_rgb": _urineResult?.rawRgb ?? _getUrineRgb(_urineResult?.color),
-      "patient_speech_text":
-          "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
+      "patient_speech_text": _patientTranscript.isNotEmpty 
+          ? _patientTranscript 
+          : "Auscultation: ${_stethResult?.lungSound ?? 'Clear'}. ECG Rhythm: ${_ecgResult?.rhythm ?? 'Normal Sinus'}.",
     };
   }
 
@@ -338,7 +348,7 @@ class TriageProvider extends ChangeNotifier {
       spo2: _spo2TempResult?.spo2.toDouble(),
       temperature: _spo2TempResult?.temperature,
       urineSeverity: _urineStatus == ScanStatus.abnormal ? 2.0 : 1.0, 
-      symptomKeywords: [], // TODO: integrate Vosk offline keywords here
+      symptomKeywords: KeywordExtractor.extractSymptoms(_patientTranscript),
     );
     final mlTriage = evaluateTriage(triageInputs);
 
@@ -485,6 +495,7 @@ class TriageProvider extends ChangeNotifier {
     _ecgResult = null;
     _spo2TempResult = null;
     _urineResult = null;
+    _patientTranscript = "";
 
     if (pageController.hasClients) {
       pageController.jumpToPage(0);
