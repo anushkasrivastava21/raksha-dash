@@ -11,6 +11,7 @@ class VitalsModel {
   final String patientSpeechText;
   final String triage;
   final double confidence;
+  final List<String> symptoms;
 
   VitalsModel({
     required this.patientId,
@@ -23,6 +24,7 @@ class VitalsModel {
     required this.patientSpeechText,
     required this.triage,
     required this.confidence,
+    this.symptoms = const [],
   });
 
   /// Factory constructor to decode full JSON payload returned from cloud server.
@@ -30,6 +32,11 @@ class VitalsModel {
     final Map<String, dynamic> data =
         json.containsKey('vitals') && json['vitals'] is Map<String, dynamic>
             ? Map<String, dynamic>.from(json['vitals'])
+            : json;
+
+    final Map<String, dynamic> triageData = 
+        json.containsKey('triage') && json['triage'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(json['triage'])
             : json;
 
     double toDouble(dynamic val, double fallback) {
@@ -55,6 +62,15 @@ class VitalsModel {
       }
     }
 
+    List<String> parsedSymptoms = [];
+    try {
+      if (triageData.containsKey('symptoms')) {
+        parsedSymptoms = List<String>.from(triageData['symptoms'] as List);
+      }
+    } catch (e) {
+      // Defensive parsing
+    }
+
     return VitalsModel(
       patientId: (data['patient_id'] ?? json['patient_id'] ?? '').toString(),
       timestamp: (data['timestamp'] ??
@@ -71,8 +87,9 @@ class VitalsModel {
       patientSpeechText:
           (data['patient_speech_text'] ?? json['patient_speech_text'] ?? '')
               .toString(),
-      triage: (json['triage'] ?? data['triage'] ?? 'GREEN').toString(),
-      confidence: toDouble(json['confidence'] ?? data['confidence'], 0.95),
+      triage: (triageData['triage'] ?? data['triage'] ?? 'GREEN').toString(),
+      confidence: toDouble(triageData['confidence'] ?? data['confidence'], 0.95),
+      symptoms: parsedSymptoms,
     );
   }
 
@@ -89,6 +106,7 @@ class VitalsModel {
       'patient_speech_text': patientSpeechText,
       'triage': triage,
       'confidence': confidence,
+      'symptoms': symptoms,
     };
   }
 }

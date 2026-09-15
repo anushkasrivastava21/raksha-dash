@@ -510,6 +510,7 @@ class TriageProvider extends ChangeNotifier {
       "timestamp": DateTime.now().toIso8601String(),
       "triage": triageColor,
       "confidence": confidence,
+      "symptoms": triageInputs.symptomKeywords,
     };
   }
 

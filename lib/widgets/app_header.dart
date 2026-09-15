@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/base.dart';
 
 /// Reusable global App Bar Header matching reference specification.
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -24,26 +25,35 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
           bottom: BorderSide(color: _onSurface, width: 2.0),
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(
-            Icons.shield,
-            color: _primaryCobalt,
-            size: 26,
-          ),
-          SizedBox(width: 8),
-          Text(
-            'RAKSHA',
-            style: TextStyle(
-              fontFamily: 'Space Mono',
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
+      child: GestureDetector(
+        onTap: () {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const BaseScreen()),
+            (route) => false,
+          );
+        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(
+              Icons.shield,
               color: _primaryCobalt,
-              letterSpacing: -1.0,
+              size: 26,
             ),
-          ),
-        ],
+            SizedBox(width: 8),
+            Text(
+              'RAKSHA',
+              style: TextStyle(
+                fontFamily: 'Space Mono',
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: _primaryCobalt,
+                letterSpacing: -1.0,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
