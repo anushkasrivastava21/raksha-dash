@@ -37,7 +37,7 @@ dependencies:
   provider: ^6.1.5+1
   http: any
   shared_preferences: ^2.5.5
-  flutter_blue_plus: ^2.3.12
+  flutter_blue_plus: ^1.34.0
   permission_handler: ^10.4.5
   vosk_flutter: ^0.3.48
   tflite_flutter: ^0.12.1
