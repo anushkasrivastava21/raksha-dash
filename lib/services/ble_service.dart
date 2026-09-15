@@ -9,6 +9,11 @@ class BleService {
   factory BleService() => _instance;
   BleService._internal();
 
+  bool _isConnecting = false;
+  bool _isIntentionalDisconnect = false;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 3;
+
   BluetoothDevice? _device;
   BluetoothCharacteristic? _rxCharacteristic; // Write
   BluetoothCharacteristic? _txCharacteristic; // Notify
@@ -23,7 +28,6 @@ class BleService {
   Stream<String> get rawDataStream => _rawDataController.stream;
 
   bool get isConnected => _device != null && _device!.isConnected;
-  bool _isConnecting = false;
 
   // Custom Constants
   static const String targetDeviceName = "ESP32_VitalsRig_01";
@@ -37,6 +41,7 @@ class BleService {
 
   Future<bool> connectToEsp32() async {
     if (_isConnecting) return false;
+    _isIntentionalDisconnect = false;
     
     try {
       _isConnecting = true;
@@ -74,6 +79,9 @@ class BleService {
                     if (state == BluetoothConnectionState.disconnected) {
                       _connectionStateController.add(false);
                       _cleanup();
+                      if (!_isIntentionalDisconnect) {
+                        _handleAutoReconnect();
+                      }
                     }
                   });
 
@@ -140,6 +148,27 @@ class BleService {
       _connectionStateController.add(false);
       _isConnecting = false;
       return false;
+    }
+  }
+
+  Future<void> _handleAutoReconnect() async {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      debugPrint('FATAL: Max reconnect attempts reached. Giving up.');
+      return;
+    }
+
+    _reconnectAttempts++;
+    debugPrint('Attempting auto-reconnect (Attempt $_reconnectAttempts of $_maxReconnectAttempts) in 2 seconds...');
+    
+    await Future.delayed(const Duration(seconds: 2));
+    
+    bool success = await connectToEsp32();
+    if (success) {
+      debugPrint('Auto-reconnect successful!');
+      _reconnectAttempts = 0; // Reset counter on success
+    } else {
+      // Retry recursively if this attempt failed
+      _handleAutoReconnect();
     }
   }
 
@@ -258,6 +287,7 @@ class BleService {
   }
 
   Future<void> disconnect() async {
+    _isIntentionalDisconnect = true;
     await _notifySub?.cancel();
     await _connectionStateSub?.cancel();
     if (_device != null) {
