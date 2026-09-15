@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart'; // <-- Naya import
 
 import 'providers/triage_provider.dart';
+import 'services/api_service.dart';
 import 'providers/triage_state.dart';
 import 'screens/asha_login_screen.dart';
 import 'screens/base.dart';
@@ -32,6 +33,9 @@ Future<void> main() async {
   
   // <-- App load hone se pehle permission maangega
   await requestBlePermissions();
+
+  // Attempt to flush offline cache in the background
+  ApiService.flushOfflineCache();
 
   final prefs = await SharedPreferences.getInstance();
   final bool isAuthenticated = prefs.getBool('is_authenticated') ?? false;

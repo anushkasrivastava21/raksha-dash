@@ -212,6 +212,59 @@ class ApiService {
     }
   }
 
+  /// Attempts to flush all locally cached payloads to the backend.
+  static Future<void> flushOfflineCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      List<String> offlineData = prefs.getStringList('unsynced_patients') ?? [];
+
+      if (offlineData.isEmpty) {
+        return;
+      }
+
+      debugPrint("🔄 [OFFLINE_CACHE] Attempting to sync ${offlineData.length} offline patient(s)...");
+      List<String> remainingData = [];
+      int successCount = 0;
+
+      for (String serializedPayload in offlineData) {
+        try {
+          final payload = jsonDecode(serializedPayload);
+          final vitalsPayload = payload.containsKey("vitals") && payload["vitals"] is Map
+              ? Map<String, dynamic>.from(payload["vitals"])
+              : payload;
+          final vitalsJson = jsonEncode(vitalsPayload);
+
+          final Uri vitalsUri = Uri.parse('$cloudBackendUrl/vitals');
+          final vitalsResponse = await _safePost(vitalsUri, vitalsJson);
+
+          if (vitalsResponse.statusCode == 200 || vitalsResponse.statusCode == 201) {
+            // Also post triage if present.
+            if (payload.containsKey("triage") && payload["triage"] is Map) {
+               try {
+                 final triageUri = Uri.parse('$cloudBackendUrl/triage');
+                 await _safePost(triageUri, jsonEncode(payload["triage"]));
+               } catch (_) {}
+            }
+            successCount++;
+          } else {
+            remainingData.add(serializedPayload);
+          }
+        } catch (e) {
+          // Network error, keep in cache
+          remainingData.add(serializedPayload);
+        }
+      }
+
+      await prefs.setStringList('unsynced_patients', remainingData);
+      
+      if (successCount > 0) {
+        debugPrint("🎉 [OFFLINE_CACHE] Successfully flushed $successCount patient(s) to cloud!");
+      }
+    } catch (e, stack) {
+      debugPrint("❌ [OFFLINE_CACHE_ERR] Failed during cache flush: $e");
+    }
+  }
+
   /// Internal helper to post to an endpoint with timeout and headers
   static Future<http.Response> _safePost(Uri uri, String body) async {
     try {
