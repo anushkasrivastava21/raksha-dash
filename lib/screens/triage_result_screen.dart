@@ -184,6 +184,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
     String triageText;
     double confidence;
     String patientId;
+    List<String> symptoms = [];
     String confidenceText;
     String patientIdText;
 
@@ -191,11 +192,19 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
       triageText = vitals.triage;
       confidence = vitals.confidence;
       patientId = vitals.patientId;
+      symptoms = vitals.symptoms;
     } else {
       final payload = triageProvider.generateTriageJsonPayload();
       triageText = payload["triage"] as String;
       confidence = payload["confidence"] as double;
       patientId = payload["patient_id"] as String;
+      try {
+        if (payload.containsKey("symptoms")) {
+          symptoms = List<String>.from(payload["symptoms"] as List);
+        }
+      } catch (e) {
+        debugPrint('Failed to parse symptoms: ');
+      }
     }
 
     confidenceText = 'AI Confidence: ${(confidence * 100).toStringAsFixed(0)}%';
@@ -236,82 +245,83 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
 
                   // MAIN CONTENT AREA
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20.0,
-                        vertical: 14.0,
-                      ),
-                      child: Column(
-                        children: [
-                          // VERDICT BANNER
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: bgColor,
-                              border: Border.all(color: borderColor, width: 2.0),
-                              borderRadius: BorderRadius.circular(12.0),
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0,
+                          vertical: 14.0,
+                        ),
+                        child: Column(
+                          children: [
+                            // VERDICT BANNER
+                            Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: bgColor,
+                                border: Border.all(color: borderColor, width: 2.0),
+                                borderRadius: BorderRadius.circular(12.0),
+                              ),
+                              padding: const EdgeInsets.all(16.0),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 48.0,
+                                    height: 48.0,
+                                    decoration: BoxDecoration(
+                                      color: borderColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      iconData,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          triageText,
+                                          style: const TextStyle(
+                                            fontFamily: 'Space Mono',
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w700,
+                                            color: _onSurface,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          confidenceText,
+                                          style: const TextStyle(
+                                            fontFamily: 'Space Mono',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: _outline,
+                                          ),
+                                        ),
+                                        Text(
+                                          patientIdText,
+                                          style: const TextStyle(
+                                            fontFamily: 'Space Mono',
+                                            fontSize: 13,
+                                            color: _outline,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            padding: const EdgeInsets.all(16.0),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 48.0,
-                                  height: 48.0,
-                                  decoration: BoxDecoration(
-                                    color: borderColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    iconData,
-                                    color: Colors.white,
-                                    size: 28,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        triageText,
-                                        style: const TextStyle(
-                                          fontFamily: 'Space Mono',
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w700,
-                                          color: _onSurface,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        confidenceText,
-                                        style: const TextStyle(
-                                          fontFamily: 'Space Mono',
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: _outline,
-                                        ),
-                                      ),
-                                      Text(
-                                        patientIdText,
-                                        style: const TextStyle(
-                                          fontFamily: 'Space Mono',
-                                          fontSize: 13,
-                                          color: _outline,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                          // VITALS LIST (5 Rows)
-                          Expanded(
-                            child: Column(
+                            // VITALS LIST (5 Rows)
+                            Column(
                               children: [
-                                Expanded(
+                                SizedBox(
+                                  height: 60,
                                   child: _buildResultRow(
                                     icon: Icons.air,
                                     label: 'SPO2',
@@ -320,7 +330,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Expanded(
+                                SizedBox(
+                                  height: 60,
                                   child: _buildResultRow(
                                     icon: Icons.monitor_heart,
                                     label: 'ECG',
@@ -329,7 +340,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Expanded(
+                                SizedBox(
+                                  height: 60,
                                   child: _buildResultRow(
                                     icon: Icons.thermostat,
                                     label: 'TEMP',
@@ -338,7 +350,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Expanded(
+                                SizedBox(
+                                  height: 60,
                                   child: _buildResultRow(
                                     icon: Icons.water_drop,
                                     label: 'URINE',
@@ -347,7 +360,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Expanded(
+                                SizedBox(
+                                  height: 60,
                                   child: _buildResultRow(
                                     icon: Icons.medical_services,
                                     label: 'LUNGS',
@@ -357,8 +371,57 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                            if (symptoms.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                                  borderRadius: BorderRadius.circular(12.0),
+                                ),
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'AI EXTRACTED SYMPTOMS',
+                                      style: TextStyle(
+                                        fontFamily: 'Space Mono',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF6B7280),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Wrap(
+                                      spacing: 8.0,
+                                      runSpacing: 8.0,
+                                      children: symptoms.map((s) => Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(16.0),
+                                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                                        ),
+                                        child: Text(
+                                          s.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontFamily: 'Space Mono',
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF374151),
+                                          ),
+                                        ),
+                                      )).toList(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
