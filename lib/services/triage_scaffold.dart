@@ -40,8 +40,8 @@ TriageResult evaluateTriage(TriageInputs inputs) {
   // Construct features array for XGBoost: ['ecg_hr', 'bp_sys', 'bp_dia', 'spo2', 'temperature', 'urine_severity']
   List<double> features = [
     inputs.ecgHr ?? double.nan,
-    double.nan, // bp_sys missing
-    double.nan, // bp_dia missing
+    120.0, // bp_sys default (normal)
+    80.0, // bp_dia default (normal)
     inputs.spo2 ?? double.nan,
     inputs.temperature ?? double.nan,
     inputs.urineSeverity ?? double.nan,
