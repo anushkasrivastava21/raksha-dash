@@ -19,7 +19,7 @@ class BleService {
   BluetoothCharacteristic? _txCharacteristic; // Notify
   
   StreamSubscription<List<int>>? _notifySub;
-  StreamSubscription<BluetoothConnectionState>? _connectionStateSub;
+  StreamSubscription? _connectionStateSub;
 
   final StreamController<bool> _connectionStateController = StreamController<bool>.broadcast();
   Stream<bool> get connectionStateStream => _connectionStateController.stream;
@@ -75,8 +75,9 @@ class BleService {
                   
                   _connectionStateController.add(true);
 
-                  _connectionStateSub = _device!.connectionState.listen((state) {
-                    if (state == BluetoothConnectionState.disconnected) {
+                  _connectionStateSub = FlutterBluePlus.events.onConnectionStateChanged.listen((event) {
+                    if (event.device.remoteId == _device?.remoteId &&
+                        event.connectionState == BluetoothConnectionState.disconnected) {
                       _connectionStateController.add(false);
                       _cleanup();
                       if (!_isIntentionalDisconnect) {
@@ -154,6 +155,8 @@ class BleService {
   Future<void> _handleAutoReconnect() async {
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       debugPrint('FATAL: Max reconnect attempts reached. Giving up.');
+      _isConnecting = false;
+      _connectionStateController.add(false);
       return;
     }
 
@@ -269,7 +272,7 @@ class BleService {
   Future<void> sendCommand(String cmd) async {
     if (_rxCharacteristic != null && isConnected) {
       try {
-        await _rxCharacteristic!.write(utf8.encode(cmd), withoutResponse: true);
+        await _rxCharacteristic!.write(utf8.encode(cmd), withoutResponse: false);
         debugPrint('Sent command: $cmd');
       } catch (e) {
         debugPrint('Failed to send command: $e');

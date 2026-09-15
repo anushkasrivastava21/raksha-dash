@@ -137,7 +137,6 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
     }
 
     StreamSubscription? sub;
-    bool received = false;
 
     // 1. Listen for incoming raw BLE strings
     sub = ble.rawDataStream.listen((rawStr) {
@@ -147,7 +146,6 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
         
         // Match incoming sensor code to this screen's expected test
         if (_isExpectedCode(sensorCode, widget.testType) && parts.length >= 2) {
-          received = true;
           sub?.cancel();
           
           if (mounted) {
@@ -170,39 +168,9 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
     // 2. Transmit the command to ESP32
     String cmd = _getCommandForType(widget.testType);
     await ble.sendCommand(cmd);
-
-    // 3. Fallback timeout & Demo Safe-Fail Mechanism
-    await Future.delayed(const Duration(seconds: 15));
-    if (!received && mounted) {
-      sub.cancel();
-      debugPrint('⚠️ [DynamicTestLoader] Sensor read timed out for ${widget.testType}. Injecting safe fallback baseline data for demo continuity.');
-      
-      final triageProvider = Provider.of<TriageProvider>(context, listen: false);
-      switch (widget.testType) {
-        case VitalTestType.spo2:
-        case VitalTestType.temp:
-          triageProvider.applySpo2TempData();
-          break;
-        case VitalTestType.hr:
-          triageProvider.applyEcgData();
-          break;
-        case VitalTestType.urine:
-          triageProvider.applyUrineData();
-          break;
-        case VitalTestType.stethoscope:
-        case VitalTestType.voice:
-          triageProvider.applyStethData();
-          break;
-      }
-
-      final triageState = Provider.of<TriageState>(context, listen: false);
-      triageState.markCompleted(widget.testType);
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardCompletedScreen()),
-      );
-    }
+    
+    // The screen will now spin indefinitely until real BLE data is received,
+    // explicitly adhering to the PRD requirement for strict hardware validation.
   }
 
   bool _isExpectedCode(String code, VitalTestType type) {
