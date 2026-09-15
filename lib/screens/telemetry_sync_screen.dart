@@ -5,7 +5,6 @@ import '../providers/triage_provider.dart';
 import '../providers/triage_state.dart';
 import '../services/ble_service.dart';
 import '../widgets/app_header.dart';
-import 'hardware_vitals_screen.dart';
 import 'dashboard_completed_screen.dart';
 
 /// Configuration data model representing loading information for a specific vital test.
@@ -175,7 +174,7 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
     // 3. Fallback timeout & Demo Safe-Fail Mechanism
     await Future.delayed(const Duration(seconds: 15));
     if (!received && mounted) {
-      sub?.cancel();
+      sub.cancel();
       debugPrint('⚠️ [DynamicTestLoader] Sensor read timed out for ${widget.testType}. Injecting safe fallback baseline data for demo continuity.');
       
       final triageProvider = Provider.of<TriageProvider>(context, listen: false);
