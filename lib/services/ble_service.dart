@@ -67,10 +67,14 @@ class BleService {
                   await _device!.connect(autoConnect: false);
                   debugPrint('BLE connected to ${_device!.platformName}');
                   
-                  // Negotiate High MTU immediately to minimize fragmentation
+                  // Negotiate exact 247 MTU to match ESP32 BLE_PREFERRED_MTU (prevents ECG packet drops)
                   if (Platform.isAndroid) {
-                    await _device!.requestMtu(512);
-                    debugPrint('MTU negotiated up to 512');
+                    try {
+                      await _device!.requestMtu(247);
+                      debugPrint('MTU negotiated to 247 (matching ESP32 BLE_PREFERRED_MTU)');
+                    } catch (e) {
+                      debugPrint('MTU request warning: $e');
+                    }
                   }
                   
                   _connectionStateController.add(true);
