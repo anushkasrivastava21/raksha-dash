@@ -193,7 +193,7 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
       case VitalTestType.temp: return 'REQ_TEMP';
       case VitalTestType.urine: return 'REQ_URINE';
       case VitalTestType.stethoscope: return 'REQ_STETH';
-      case VitalTestType.voice: return 'REQ_VOICE';
+      case VitalTestType.voice: return ''; // Local voice processing; DO NOT spam BLE
     }
   }
 

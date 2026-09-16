@@ -15,15 +15,8 @@ class TriageState extends ChangeNotifier {
     VitalTestType.voice: TestCardStatus.empty,
   };
 
-  // Optional measured value store
-  final Map<VitalTestType, String> _readings = {
-    VitalTestType.spo2: '98%',
-    VitalTestType.hr: '72 BPM',
-    VitalTestType.temp: '98.6°F',
-    VitalTestType.urine: 'NORMAL',
-    VitalTestType.stethoscope: 'CLEAR',
-    VitalTestType.voice: 'RECORDED',
-  };
+  // Optional measured value store (cleared of mock data)
+  final Map<VitalTestType, String> _readings = {};
 
   // ── STATUS GETTERS ─────────────────────────────────────────────────────────
 
