@@ -328,6 +328,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                           icon: Icons.air,
                                           title: 'SPO2',
                                           sensor: 'SENSOR: MAX30102',
+                                          reading: triageState.isCompleted(VitalTestType.spo2) ? triageState.getReading(VitalTestType.spo2) : null,
                                           onTap: () => _navigateToTest(context, VitalTestType.spo2),
                                         ),
                                       ),
@@ -337,7 +338,8 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                             isCompleted: triageState.isCompleted(VitalTestType.hr),
                                             icon: Icons.monitor_heart_outlined,
                                             title: 'ECG',
-                                            sensor: 'SENSOR: MAX30102',
+                                            sensor: 'SENSOR: AD8232',
+                                            reading: triageState.isCompleted(VitalTestType.hr) ? triageState.getReading(VitalTestType.hr) : null,
                                             onTap: () => _navigateToTest(context, VitalTestType.hr),
                                           ),
                                         ),
@@ -356,6 +358,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                           icon: Icons.thermostat,
                                           title: 'TEMP',
                                           sensor: 'SENSOR: MLX90614',
+                                          reading: triageState.isCompleted(VitalTestType.temp) ? triageState.getReading(VitalTestType.temp) : null,
                                           onTap: () => _navigateToTest(context, VitalTestType.temp),
                                         ),
                                       ),
@@ -366,6 +369,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                           icon: Icons.science,
                                           title: 'URINE',
                                           sensor: 'SENSOR: STRIP-READER',
+                                          reading: triageState.isCompleted(VitalTestType.urine) ? triageState.getReading(VitalTestType.urine) : null,
                                           onTap: () => _navigateToTest(context, VitalTestType.urine),
                                         ),
                                       ),
@@ -381,6 +385,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                     icon: Icons.medical_services_outlined,
                                     title: 'STETHOSCOPE',
                                     sensor: 'SENSOR: PIEZO-MIC',
+                                    reading: triageState.isCompleted(VitalTestType.stethoscope) ? triageState.getReading(VitalTestType.stethoscope) : null,
                                     onTap: () => _navigateToTest(context, VitalTestType.stethoscope),
                                   ),
                                 ),
@@ -517,6 +522,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     required IconData icon,
     required String title,
     required String sensor,
+    required String? reading,
     required VoidCallback onTap,
   }) {
     return Material(
@@ -546,18 +552,19 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                 Expanded(
                   child: Center(
                     child: Text(
-                      title,
-                      style: const TextStyle(
+                      isCompleted ? (reading ?? 'DONE') : title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
                         fontFamily: 'Space Mono',
-                        fontSize: 28,
+                        fontSize: isCompleted ? 18 : 28,
                         fontWeight: FontWeight.w700,
-                        color: _onSurface,
+                        color: isCompleted ? _completedGreen : _onSurface,
                       ),
                     ),
                   ),
                 ),
                 Text(
-                  isCompleted ? 'Tap to retake Test' : sensor,
+                  isCompleted ? 'Tap to retake' : sensor,
                   style: TextStyle(
                     fontFamily: 'Space Mono',
                     fontSize: 10,
