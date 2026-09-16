@@ -8,6 +8,8 @@ import '../providers/triage_provider.dart';
 import '../patient_provider.dart';
 import '../services/ble_service.dart';
 import '../services/speech_service.dart';
+import '../services/api_service.dart';
+import '../services/keyword_extractor.dart';
 import '../widgets/app_header.dart';
 import 'telemetry_sync_screen.dart';
 import 'triage_result_screen.dart';
@@ -133,11 +135,83 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
       setState(() {
         _isListening = false;
       });
-      
-      // Inject final transcript to XGBoost extraction
-      triageProvider.setPatientTranscript(_liveTranscript);
-      triageState.markCompleted(VitalTestType.voice, reading: "RECORDED");
+
+      final String cleanTranscript = _liveTranscript.trim();
+
+      // UN-MOCK / STRICT VALIDATION:
+      // If no speech was captured, DO NOT mark the card as completed!
+      if (cleanTranscript.isEmpty) {
+        debugPrint('⚠️ [VoicePipeline] Empty audio transcript. Resetting voice state to empty.');
+        triageState.markEmpty(VitalTestType.voice);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No speech detected. Please speak into the mic.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 1. Ingest real transcript into central state
+      triageProvider.setPatientTranscript(cleanTranscript);
+
+      // 2. On-Device inference using Anirudh's negation-aware clinical model
+      final List<String> detectedSymptoms = KeywordExtractor.extractSymptoms(cleanTranscript);
+      debugPrint('🎙️ [VoicePipeline] Real transcript: "$cleanTranscript"');
+      debugPrint('🧠 [VoicePipeline] Anirudh local extractor detected: $detectedSymptoms');
+
+      // 3. Connect to Anirudh's backend ML Engine (/predict) if online/reachable
+      ApiService.predictWithMlEngine(
+        patientId: triageProvider.patientInfo.id,
+        patientSpeechText: cleanTranscript,
+        spo2: triageProvider.spo2TempResult?.spo2.toDouble(),
+        temperature: triageProvider.spo2TempResult?.temperature,
+        ecgHr: (triageProvider.ecgResult?.heartRate ?? triageProvider.stethResult?.heartRate),
+        urineRgb: triageProvider.urineResult?.rawRgb,
+      ).then((mlResult) {
+        if (mlResult != null && mlResult['symptoms'] is List) {
+          final serverSymptoms = List<String>.from(mlResult['symptoms']);
+          debugPrint('☁️ [VoicePipeline] Anirudh ML Engine verified symptoms: $serverSymptoms');
+        }
+      });
+
+      // 4. Mark completed ONLY when real speech data has been extracted
+      final String readingLabel = detectedSymptoms.isNotEmpty
+          ? "${detectedSymptoms.length} SYMPTOM${detectedSymptoms.length > 1 ? 'S' : ''}"
+          : "VOICE RECORDED";
+      triageState.markCompleted(VitalTestType.voice, reading: readingLabel);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              detectedSymptoms.isNotEmpty
+                  ? 'Symptoms Detected: ${detectedSymptoms.join(", ")}'
+                  : 'Recorded: "$cleanTranscript"',
+            ),
+            backgroundColor: const Color(0xFF1E8E3E),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } else {
+      // Ensure microphone permission is granted before starting
+      final bool hasPermission = await speechService.requestMicrophonePermission();
+      if (!hasPermission) {
+        debugPrint('❌ [VoicePipeline] Microphone permission denied.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Microphone permission required for voice triage.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() {
         _isListening = true;
         _liveTranscript = "";
@@ -152,10 +226,14 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
             setState(() {
               _liveTranscript = transcript;
             });
-            // Update provider live
             triageProvider.setPatientTranscript(transcript);
           }
         });
+      } else {
+        setState(() {
+          _isListening = false;
+        });
+        triageState.markEmpty(VitalTestType.voice);
       }
     }
   }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:vosk_flutter/vosk_flutter.dart' as vosk;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,21 @@ class AppSpeechService {
   bool get isListening => _isListening;
 
   static const String _modelZipPath = 'assets/models/vosk-model-small-en-us-0.15.zip';
+
+  /// Ensures microphone permission is granted before attempting audio recording.
+  Future<bool> requestMicrophonePermission() async {
+    try {
+      final status = await Permission.microphone.request();
+      if (!status.isGranted) {
+        debugPrint('⚠️ [AppSpeechService] Microphone permission not granted: $status');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ [AppSpeechService] Permission request error: $e');
+      return false;
+    }
+  }
 
   /// Initializes the Vosk model and recognizer from the bundled zip asset.
   Future<void> initialize() async {
