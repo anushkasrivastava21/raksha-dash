@@ -300,9 +300,9 @@ class TriageProvider extends ChangeNotifier {
         case 'SPO2':
         case 'MAX30102':
           _spo2TempResult = Spo2TempResult(
-            spo2: (data['spo2'] ?? 98).toInt(),
+            spo2: (data['spo2_percent'] ?? 98).toInt(),
             temperature: _spo2TempResult?.temperature ?? 36.5,
-            heartRate: (data['hr'] ?? 72).toInt(),
+            heartRate: (data['heart_rate_bpm'] ?? 72).toInt(),
           );
           _spo2TempStatus = ScanStatus.clean;
           break;
@@ -310,7 +310,7 @@ class TriageProvider extends ChangeNotifier {
         case 'MLX90614':
           _spo2TempResult = Spo2TempResult(
             spo2: _spo2TempResult?.spo2 ?? 98,
-            temperature: (data['temp'] ?? 36.5).toDouble(),
+            temperature: (data['body_temp_c'] ?? 36.5).toDouble(),
             heartRate: _spo2TempResult?.heartRate ?? 72,
           );
           _spo2TempStatus = ScanStatus.clean;
@@ -326,7 +326,7 @@ class TriageProvider extends ChangeNotifier {
                 .toList();
           }
           _ecgResult = EcgResult(
-            heartRate: (data['hr'] ?? 75.0).toDouble(),
+            heartRate: (data['hr'] ?? data['heart_rate_bpm'] ?? 75.0).toDouble(),
             rhythm: data['rhythm'] ?? 'Normal Sinus',
             qtInterval: (data['qt'] ?? 400.0).toDouble(),
             rawSamples: ecgSamples,
@@ -342,10 +342,13 @@ class TriageProvider extends ChangeNotifier {
           break;
         case 'URINE':
           _urineResult = UrineResult(
-            color: data['color'] ?? 'Yellow',
+            color: 'Analyzed',
             ph: (data['ph'] ?? 6.5).toDouble(),
             protein: data['protein'] ?? 'Negative',
             glucose: data['glucose'] ?? 'Negative',
+            rawRgb: (data.containsKey('red') && data.containsKey('green') && data.containsKey('blue')) 
+                ? [data['red'].toDouble(), data['green'].toDouble(), data['blue'].toDouble()] 
+                : null,
           );
           _urineStatus = ScanStatus.clean;
 

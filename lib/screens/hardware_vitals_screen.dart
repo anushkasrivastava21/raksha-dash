@@ -74,22 +74,22 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
             switch (sensorCode) {
               case 'SPO2':
               case 'MAX30102':
-                if (parsed.containsKey('spo2')) {
-                  triageState.markCompleted(VitalTestType.spo2, reading: "${parsed['spo2']}%");
+                if (parsed.containsKey('spo2_percent')) {
+                  triageState.markCompleted(VitalTestType.spo2, reading: "${parsed['spo2_percent']}%");
                 }
-                if (parsed.containsKey('hr')) {
-                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['hr']} BPM");
+                if (parsed.containsKey('heart_rate_bpm')) {
+                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['heart_rate_bpm']} BPM");
                 }
                 break;
               case 'TEMP':
               case 'MLX90614':
-                if (parsed.containsKey('temp')) {
-                  triageState.markCompleted(VitalTestType.temp, reading: "${parsed['temp']}°C");
+                if (parsed.containsKey('body_temp_c')) {
+                  triageState.markCompleted(VitalTestType.temp, reading: "${parsed['body_temp_c']}°C");
                 }
                 break;
               case 'URINE':
-                if (parsed.containsKey('color')) {
-                  triageState.markCompleted(VitalTestType.urine, reading: "${parsed['color']}");
+                if (parsed.containsKey('red') && parsed.containsKey('green') && parsed.containsKey('blue')) {
+                  triageState.markCompleted(VitalTestType.urine, reading: "RGB(${parsed['red']}, ${parsed['green']}, ${parsed['blue']})");
                 }
                 break;
             }
