@@ -179,7 +179,9 @@ class BleService {
   Future<void> _subscribeToTxCharacteristic() async {
     if (_txCharacteristic == null) return;
     
-    await _txCharacteristic!.setNotifyValue(true);
+    // [FIX]: Subscribe to the stream BEFORE enabling notifications on the hardware.
+    // ESP32 might blast data the millisecond CCCD 0x2902 is set to 1.
+    // If we await setNotifyValue first, we miss the index 0 chunk and drop the packet!
     _notifySub = _txCharacteristic!.onValueReceived.listen((value) {
       if (value.isEmpty) return;
       
@@ -219,6 +221,8 @@ class BleService {
         _processReassembledPayload(fullPayload);
       }
     });
+
+    await _txCharacteristic!.setNotifyValue(true);
   }
 
   void _processReassembledPayload(List<int> payloadBytes) {
