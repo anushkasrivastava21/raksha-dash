@@ -140,18 +140,19 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
 
     // 1. Listen for incoming raw BLE strings
     sub = ble.rawDataStream.listen((rawStr) {
-      final parts = rawStr.split('|').map((e) => e.trim()).toList();
-      if (parts.isNotEmpty) {
-        String sensorCode = parts[0];
+      final int firstPipe = rawStr.indexOf('|');
+      if (firstPipe > 0) {
+        String sensorCode = rawStr.substring(0, firstPipe).trim();
+        String jsonPayload = rawStr.substring(firstPipe + 1).trim();
         
         // Match incoming sensor code to this screen's expected test
-        if (_isExpectedCode(sensorCode, widget.testType) && parts.length >= 2) {
+        if (_isExpectedCode(sensorCode, widget.testType)) {
           sub?.cancel();
           
           if (mounted) {
             // Push validated payload into the state management!
             final triageProvider = Provider.of<TriageProvider>(context, listen: false);
-            triageProvider.updateFromBleJson(sensorCode, parts[1]);
+            triageProvider.updateFromBleJson(sensorCode, jsonPayload);
             
             final triageState = Provider.of<TriageState>(context, listen: false);
             triageState.markCompleted(widget.testType);

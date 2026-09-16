@@ -181,76 +181,74 @@ class BleService {
     
     // [FIX]: Subscribe to the stream BEFORE enabling notifications on the hardware.
     // ESP32 might blast data the millisecond CCCD 0x2902 is set to 1.
-    // If we await setNotifyValue first, we miss the index 0 chunk and drop the packet!
-    _notifySub = _txCharacteristic!.onValueReceived.listen((value) {
-      if (value.isEmpty) return;
+    _notifySub = _txCharacteristic!.onValueReceived.listen((rawBytes) {
+      if (rawBytes.isEmpty) return;
       
-      // Implement Custom Chunking Parser
-      int header = value[0];
-      int totalChunks = header >> 4;
-      int chunkIndex = header & 0x0F;
+      // ── Step 1: Parse the chunk header byte ──
+      final headerByte = rawBytes[0];
+      final totalChunks = (headerByte >> 4) & 0x0F;
+      final chunkIndex  = headerByte & 0x0F;
 
       if (totalChunks == 0) return; // Invalid header
       
-      // Reset buffer if this is the start of a new packet sequence
+      // ── Step 2: Store chunk payload (bytes after header) ──
       if (_expectedChunks == 0 || _expectedChunks != totalChunks || chunkIndex == 0) {
         _chunkBuffer.clear();
         _expectedChunks = totalChunks;
       }
       
-      // Store payload fragment (strip byte[0] header)
-      _chunkBuffer[chunkIndex] = value.sublist(1);
+      _chunkBuffer[chunkIndex] = rawBytes.sublist(1);
       
-      // Check if all chunks have arrived
-      if (_chunkBuffer.length == totalChunks) {
-        List<int> fullPayload = [];
-        for (int i = 0; i < totalChunks; i++) {
-          if (_chunkBuffer.containsKey(i)) {
-            fullPayload.addAll(_chunkBuffer[i]!);
-          } else {
-            debugPrint('Missing chunk index $i, dropping packet.');
-            _chunkBuffer.clear();
-            _expectedChunks = 0;
-            return;
-          }
+      // ── Step 3: Check if all chunks received ──
+      if (_chunkBuffer.length < totalChunks) return;
+      
+      // ── Step 4: Reassemble in order ──
+      List<int> fullPayload = [];
+      for (int i = 0; i < totalChunks; i++) {
+        if (_chunkBuffer.containsKey(i)) {
+          fullPayload.addAll(_chunkBuffer[i]!);
+        } else {
+          debugPrint('Missing chunk index $i, dropping packet.');
+          _chunkBuffer.clear();
+          _expectedChunks = 0;
+          return;
         }
-        
-        _chunkBuffer.clear();
-        _expectedChunks = 0;
-        
-        _processReassembledPayload(fullPayload);
       }
+      
+      _chunkBuffer.clear();
+      _expectedChunks = 0;
+      
+      _processReassembledPayload(fullPayload);
     });
 
-    await _txCharacteristic!.setNotifyValue(true);
+    if (_txCharacteristic!.properties.notify) {
+      await _txCharacteristic!.setNotifyValue(true);
+      debugPrint('BLE: TX notify subscribed');
+    }
   }
 
   void _processReassembledPayload(List<int> payloadBytes) {
     try {
-      String rawStr = utf8.decode(payloadBytes);
+      final String fullPacket = utf8.decode(payloadBytes, allowMalformed: true).trim();
       
-      // Format: <SENSOR_CODE> | <json_payload> | <CRC8_hex>
-      List<String> parts = rawStr.split('|').map((e) => e.trim()).toList();
+      // ── Step 6: Validate & strip CRC8 ──
+      // Packet format: "SENSOR_CODE|{json}|CRC8hex"
+      final int lastPipe = fullPacket.lastIndexOf('|');
+      if (lastPipe < 0) return;
+
+      final String dataWithoutCrc = fullPacket.substring(0, lastPipe);
+      final String crcHex = fullPacket.substring(lastPipe + 1);
       
-      if (parts.length >= 3) {
-        String sensorCode = parts[0];
-        String jsonPayload = parts[1];
-        String crcHex = parts[2];
-        
-        // [FIX]: The ESP32 computes CRC on the entire "SENSOR_CODE|JSON_PAYLOAD" string, not just the JSON!
-        String body = "$sensorCode|$jsonPayload";
-        int computedCrc = _computeCrc8(utf8.encode(body));
-        int receivedCrc = int.parse(crcHex, radix: 16);
-        
-        if (computedCrc == receivedCrc) {
-          debugPrint('Valid Packet - Sensor: $sensorCode, Data: $jsonPayload');
-          // Pass valid raw data downstream to UI
-          _rawDataController.add(rawStr);
-        } else {
-          debugPrint('CRC mismatch! Computed: 0x${computedCrc.toRadixString(16)}, Received: 0x$crcHex');
-        }
+      // Local CRC8 validation on SENSOR_CODE|{json}
+      int computedCrc = _computeCrc8(utf8.encode(dataWithoutCrc));
+      int receivedCrc = int.parse(crcHex, radix: 16);
+      
+      if (computedCrc == receivedCrc) {
+        debugPrint('Valid Packet: $dataWithoutCrc');
+        // ── Step 7: Emit clean "SENSOR_CODE|{json}" to rawDataStream ──
+        _rawDataController.add(dataWithoutCrc);
       } else {
-        debugPrint('Malformed payload structure: $rawStr');
+        debugPrint('CRC mismatch! Computed: 0x${computedCrc.toRadixString(16)}, Received: 0x$crcHex');
       }
     } catch (e) {
       debugPrint('Failed to process reassembled payload: $e');

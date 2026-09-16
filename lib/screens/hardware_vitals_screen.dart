@@ -58,10 +58,10 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
 
         // The exact break in the pipeline: Parse telemetry and update UI state!
         try {
-          final parts = data.split('|').map((e) => e.trim()).toList();
-          if (parts.length >= 2) {
-            final sensorCode = parts[0];
-            final jsonPayload = parts[1];
+          final int firstPipe = data.indexOf('|');
+          if (firstPipe > 0) {
+            final sensorCode = data.substring(0, firstPipe).trim();
+            final jsonPayload = data.substring(firstPipe + 1).trim();
             
             final triageProvider = context.read<TriageProvider>();
             final triageState = context.read<TriageState>();
