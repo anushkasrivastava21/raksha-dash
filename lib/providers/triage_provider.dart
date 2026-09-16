@@ -340,6 +340,13 @@ class TriageProvider extends ChangeNotifier {
             _runEcgInference(ecgSamples);
           }
           break;
+        case 'STETH':
+          _stethResult = StethResult(
+            heartRate: 72.0, // Steth just validates audio RMS currently
+            lungSound: 'Clear', 
+          );
+          _stethStatus = ScanStatus.clean;
+          break;
         case 'URINE':
           _urineResult = UrineResult(
             color: 'Analyzed',
