@@ -237,8 +237,9 @@ class BleService {
         String jsonPayload = parts[1];
         String crcHex = parts[2];
         
-        // Local CRC8 validation on json_payload
-        int computedCrc = _computeCrc8(utf8.encode(jsonPayload));
+        // [FIX]: The ESP32 computes CRC on the entire "SENSOR_CODE|JSON_PAYLOAD" string, not just the JSON!
+        String body = "$sensorCode|$jsonPayload";
+        int computedCrc = _computeCrc8(utf8.encode(body));
         int receivedCrc = int.parse(crcHex, radix: 16);
         
         if (computedCrc == receivedCrc) {

@@ -92,6 +92,17 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                   triageState.markCompleted(VitalTestType.urine, reading: "RGB(${parsed['red']}, ${parsed['green']}, ${parsed['blue']})");
                 }
                 break;
+              case 'ECG':
+              case 'HR':
+                if (parsed.containsKey('heart_rate_bpm')) {
+                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['heart_rate_bpm']} BPM");
+                }
+                break;
+              case 'STETH':
+                if (parsed.containsKey('rms')) {
+                  triageState.markCompleted(VitalTestType.stethoscope, reading: "RMS: ${parsed['rms']}");
+                }
+                break;
             }
           }
         } catch (e) {
