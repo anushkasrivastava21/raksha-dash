@@ -125,6 +125,7 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                                               ? Icons.check_circle
                                               : Icons.air,
                                           title: 'SPO2',
+                                          reading: triageState.getReading(VitalTestType.spo2),
                                           subtitle: 'Tap to retake Test',
                                           onTap: () => _navigateToTest(context, VitalTestType.spo2),
                                         ),
@@ -137,6 +138,7 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                                               ? Icons.check_circle
                                               : Icons.monitor_heart_outlined,
                                           title: 'ECG',
+                                          reading: triageState.getReading(VitalTestType.hr),
                                           subtitle: 'Tap to retake Test',
                                           onTap: () => _navigateToTest(context, VitalTestType.hr),
                                         ),
@@ -157,6 +159,7 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                                               ? Icons.check_circle
                                               : Icons.thermostat,
                                           title: 'TEMP',
+                                          reading: triageState.getReading(VitalTestType.temp),
                                           subtitle: 'Tap to retake Test',
                                           onTap: () => _navigateToTest(context, VitalTestType.temp),
                                         ),
@@ -169,6 +172,7 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                                               ? Icons.check_circle
                                               : Icons.science,
                                           title: 'URINE',
+                                          reading: triageState.getReading(VitalTestType.urine),
                                           subtitle: 'Tap to retake Test',
                                           onTap: () => _navigateToTest(context, VitalTestType.urine),
                                         ),
@@ -186,6 +190,7 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                                         ? Icons.check_circle
                                         : Icons.medical_services_outlined,
                                     title: 'STETHOSCOPE',
+                                    reading: triageState.getReading(VitalTestType.stethoscope),
                                     subtitle: 'Tap to retake Test',
                                     onTap: () => _navigateToTest(context, VitalTestType.stethoscope),
                                   ),
@@ -300,6 +305,7 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
     required bool isCompleted,
     required IconData icon,
     required String title,
+    required String? reading,
     required String subtitle,
     required VoidCallback onTap,
   }) {
@@ -330,12 +336,12 @@ class _DashboardCompletedScreenState extends State<DashboardCompletedScreen> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      title,
-                      style: const TextStyle(
+                      isCompleted ? (reading ?? 'DONE') : title,
+                      style: TextStyle(
                         fontFamily: 'Space Mono',
-                        fontSize: 28,
+                        fontSize: isCompleted ? 20 : 28,
                         fontWeight: FontWeight.w700,
-                        color: _onSurface,
+                        color: isCompleted ? _completedGreen : _onSurface,
                       ),
                     ),
                   ),

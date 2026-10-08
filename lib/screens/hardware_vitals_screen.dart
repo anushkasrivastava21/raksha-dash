@@ -48,11 +48,66 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   StreamSubscription<String>? _speechSubscription;
   bool _isListening = false;
   String _liveTranscript = "";
+  StreamSubscription<String>? _bleSubscription;
+
+  // ── Force Pass helpers ──────────────────────────────────────────────────
+  // Injects a clinically valid random payload for the selected sensor only.
+  // All other sensor values and triage logic are completely unaffected.
+  void _forcePassSensor(VitalTestType type) {
+    final triageProvider = context.read<TriageProvider>();
+    final triageState = context.read<TriageState>();
+    final rng = DateTime.now().millisecondsSinceEpoch;
+
+    switch (type) {
+      case VitalTestType.spo2:
+        // SpO2: 94–99%, HR: 68–95 BPM
+        final spo2 = 94 + (rng % 6);
+        final hr = 68 + (rng % 28);
+        triageProvider.updateFromBleJson('SPO2', '{"spo2_percent":$spo2,"heart_rate_bpm":$hr,"ir_raw":120000}');
+        triageState.markCompleted(VitalTestType.spo2, reading: '$spo2%');
+        break;
+      case VitalTestType.hr:
+        // ECG: HR 68–95 BPM, Normal Sinus
+        final hr = 68 + (rng % 28);
+        triageProvider.updateFromBleJson('ECG', '{"heart_rate_bpm":$hr,"hr":$hr,"rhythm":"Normal Sinus","qt":400}');
+        triageState.markCompleted(VitalTestType.hr, reading: '$hr BPM');
+        break;
+      case VitalTestType.temp:
+        // Temp: 36.6–37.2°C
+        final temp = (366 + (rng % 7)) / 10.0;
+        triageProvider.updateFromBleJson('TEMP', '{"body_temp_c":$temp}');
+        triageState.markCompleted(VitalTestType.temp, reading: '${temp}°C');
+        break;
+      case VitalTestType.urine:
+        // Urine: healthy pale yellow
+        triageProvider.updateFromBleJson('URINE', '{"red":3100,"green":3000,"blue":2700}');
+        triageState.markCompleted(VitalTestType.urine, reading: 'RGB(3100,3000,2700)');
+        break;
+      case VitalTestType.stethoscope:
+        // Steth: moderate RMS
+        triageProvider.updateFromBleJson('STETH', '{"rms":1800,"min":0,"max":3500,"samples":50}');
+        triageState.markCompleted(VitalTestType.stethoscope, reading: 'RMS: 1800');
+        break;
+      case VitalTestType.voice:
+        // Voice: inject a benign transcript
+        triageProvider.setPatientTranscript('Patient reports no symptoms.');
+        triageState.markCompleted(VitalTestType.voice, reading: 'FORCE PASS');
+        break;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('⚡ Force Pass: ${type.name.toUpperCase()} injected'),
+        backgroundColor: const Color(0xFF004AC6),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    BleService().rawDataStream.listen((data) {
+    _bleSubscription = BleService().rawDataStream.listen((data) {
       if (mounted) {
         setState(() {
           _rawBleData = data;
@@ -79,9 +134,11 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                 if (parsed.containsKey('spo2_percent')) {
                   triageState.markCompleted(VitalTestType.spo2, reading: "${parsed['spo2_percent']}%");
                 }
-                if (parsed.containsKey('heart_rate_bpm')) {
-                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['heart_rate_bpm']} BPM");
-                }
+                // TODO (Hardware Update): The MAX30102 provides HR, but we want the AD8232 ECG to provide it instead. 
+                // We've commented this out so ECG isn't automatically skipped.
+                // if (parsed.containsKey('heart_rate_bpm')) {
+                //   triageState.markCompleted(VitalTestType.hr, reading: "${parsed['heart_rate_bpm']} BPM");
+                // }
                 break;
               case 'TEMP':
               case 'MLX90614':
@@ -105,6 +162,12 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                   triageState.markCompleted(VitalTestType.stethoscope, reading: "RMS: ${parsed['rms']}");
                 }
                 break;
+              case 'ERR':
+                if (parsed.containsKey('sensor') && parsed['sensor'] == 'TEMP') {
+                  // TODO (Hardware Update): Bypassing broken MLX90614 sensor
+                  triageState.markCompleted(VitalTestType.temp, reading: "37.0°C (BYPASS)");
+                }
+                break;
             }
           }
         } catch (e) {
@@ -118,6 +181,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
 
   @override
   void dispose() {
+    _bleSubscription?.cancel();
     _speechSubscription?.cancel();
     AppSpeechService().dispose(); // Strict memory release on pop
     super.dispose();
@@ -171,15 +235,40 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
         ecgHr: (triageProvider.ecgResult?.heartRate ?? triageProvider.stethResult?.heartRate),
         urineRgb: triageProvider.urineResult?.rawRgb,
       ).then((mlResult) {
-        if (mlResult != null && mlResult['symptoms'] is List) {
-          final serverSymptoms = List<String>.from(mlResult['symptoms']);
-          debugPrint('☁️ [VoicePipeline] Anirudh ML Engine verified symptoms: $serverSymptoms');
+        if (mlResult != null) {
+          final serverSymptoms = mlResult['symptoms'] is List
+              ? List<String>.from(mlResult['symptoms'])
+              : <String>[];
+          final serverTriage = mlResult['triage']?.toString();
+
+          // ✅ NOW WIRED: feed server symptoms + triage signal back into the provider
+          triageProvider.setServerSymptoms(serverSymptoms, triageColor: serverTriage);
+
+          debugPrint('☁️ [VoicePipeline] ML Engine responded — symptoms: $serverSymptoms, triage: $serverTriage');
+
+          // Update the voice card reading to reflect server-augmented symptom count
+          if (mounted && serverSymptoms.isNotEmpty) {
+            final allSymptoms = {...detectedSymptoms, ...serverSymptoms};
+            context.read<TriageState>().markCompleted(
+              VitalTestType.voice,
+              reading: cleanTranscript.length > 18 ? "${cleanTranscript.substring(0, 18)}..." : cleanTranscript,
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('☁️ ML Engine: ${allSymptoms.join(", ")}'),
+                backgroundColor: const Color(0xFF004AC6),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        } else {
+          debugPrint('⚠️ [VoicePipeline] ML Engine unreachable — using on-device results only.');
         }
       });
 
       // 4. Mark completed ONLY when real speech data has been extracted
-      final String readingLabel = detectedSymptoms.isNotEmpty
-          ? "${detectedSymptoms.length} SYMPTOM${detectedSymptoms.length > 1 ? 'S' : ''}"
+      final String readingLabel = cleanTranscript.isNotEmpty
+          ? (cleanTranscript.length > 18 ? "${cleanTranscript.substring(0, 18)}..." : cleanTranscript)
           : "VOICE RECORDED";
       triageState.markCompleted(VitalTestType.voice, reading: readingLabel);
 
@@ -196,6 +285,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
           ),
         );
       }
+
     } else {
       // Ensure microphone permission is granted before starting
       final bool hasPermission = await speechService.requestMicrophonePermission();
@@ -212,6 +302,8 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
         return;
       }
 
+      await speechService.initialize(); // Initialize here, AFTER permissions are granted!
+
       setState(() {
         _isListening = true;
         _liveTranscript = "";
@@ -224,9 +316,13 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
         _speechSubscription = stream.listen((transcript) {
           if (mounted) {
             setState(() {
-              _liveTranscript = transcript;
+              if (_liveTranscript.isNotEmpty) {
+                _liveTranscript += " " + transcript;
+              } else {
+                _liveTranscript = transcript;
+              }
             });
-            triageProvider.setPatientTranscript(transcript);
+            triageProvider.setPatientTranscript(_liveTranscript);
           }
         });
       } else {
@@ -272,6 +368,13 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
 
     if (!context.mounted) return;
 
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TriageResultScreen(vitals: result),
+      ),
+    );
+
     if (mewsResult["override"] == true && mewsResult["status"] == "RED") {
       Navigator.push(
         context,
@@ -279,15 +382,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
           builder: (context) => MewsCriticalAlertScreen(reason: mewsResult["reason"]),
         ),
       );
-      return;
     }
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TriageResultScreen(vitals: result),
-      ),
-    );
   }
 
   Future<void> _toggleBleConnection() async {
@@ -304,6 +399,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   @override
   Widget build(BuildContext context) {
     final triageState = context.watch<TriageState>();
+    final triageProvider = context.watch<TriageProvider>();
     final bool isReady = triageState.isReadyForAI;
 
     return Scaffold(
@@ -408,6 +504,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                           sensor: 'SENSOR: MAX30102',
                                           reading: triageState.isCompleted(VitalTestType.spo2) ? triageState.getReading(VitalTestType.spo2) : null,
                                           onTap: () => _navigateToTest(context, VitalTestType.spo2),
+                                          onForcePass: () => _forcePassSensor(VitalTestType.spo2),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -419,6 +516,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                             sensor: 'SENSOR: AD8232',
                                             reading: triageState.isCompleted(VitalTestType.hr) ? triageState.getReading(VitalTestType.hr) : null,
                                             onTap: () => _navigateToTest(context, VitalTestType.hr),
+                                            onForcePass: () => _forcePassSensor(VitalTestType.hr),
                                           ),
                                         ),
                                     ],
@@ -438,6 +536,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                           sensor: 'SENSOR: MLX90614',
                                           reading: triageState.isCompleted(VitalTestType.temp) ? triageState.getReading(VitalTestType.temp) : null,
                                           onTap: () => _navigateToTest(context, VitalTestType.temp),
+                                          onForcePass: () => _forcePassSensor(VitalTestType.temp),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -449,6 +548,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                           sensor: 'SENSOR: STRIP-READER',
                                           reading: triageState.isCompleted(VitalTestType.urine) ? triageState.getReading(VitalTestType.urine) : null,
                                           onTap: () => _navigateToTest(context, VitalTestType.urine),
+                                          onForcePass: () => _forcePassSensor(VitalTestType.urine),
                                         ),
                                       ),
                                     ],
@@ -465,6 +565,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                                     sensor: 'SENSOR: PIEZO-MIC',
                                     reading: triageState.isCompleted(VitalTestType.stethoscope) ? triageState.getReading(VitalTestType.stethoscope) : null,
                                     onTap: () => _navigateToTest(context, VitalTestType.stethoscope),
+                                    onForcePass: () => _forcePassSensor(VitalTestType.stethoscope),
                                   ),
                                 ),
                               ],
@@ -496,50 +597,118 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                               ),
                             ),
 
-                          // MIC ACTION BUTTON (88px x 88px)
+                          // MIC / VOICE SECTION
                           const SizedBox(height: 10),
-                          Center(
-                            child: InkWell(
-                              onTap: () => _navigateToTest(context, VitalTestType.voice),
-                              child: Container(
-                                width: 80.0,
-                                height: 80.0,
-                                decoration: BoxDecoration(
-                                  color: _isListening
-                                      ? Colors.red.withValues(alpha: 0.1)
-                                      : triageState.isCompleted(VitalTestType.voice)
-                                          ? _completedBg
-                                          : Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _isListening
-                                        ? Colors.red
-                                        : triageState.isCompleted(VitalTestType.voice)
-                                            ? _completedGreen
-                                            : _borderGray,
-                                    width: triageState.isCompleted(VitalTestType.voice) || _isListening ? 2.0 : 1.0,
-                                  ),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Color(0x0D000000),
-                                      blurRadius: 4,
-                                      offset: Offset(0, 2),
+                          Column(
+                            children: [
+                              if (_isListening) ...
+                                [
+                                  // Live transcript preview
+                                  if (_liveTranscript.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                      child: Text(
+                                        _liveTranscript,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontFamily: 'Space Mono',
+                                          fontSize: 11,
+                                          color: Color(0xFF434655),
+                                        ),
+                                      ),
                                     ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  triageState.isCompleted(VitalTestType.voice) && !_isListening
-                                      ? Icons.check_circle
-                                      : Icons.mic,
-                                  color: _isListening
-                                      ? Colors.red
-                                      : triageState.isCompleted(VitalTestType.voice)
-                                          ? _completedGreen
-                                          : _primaryContainer,
-                                  size: 38,
-                                ),
-                              ),
-                            ),
+                                  // STOP & SUBMIT button — clearly visible when recording
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton.icon(
+                                      onPressed: _toggleMicrophone,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      icon: const Icon(Icons.stop_circle_outlined),
+                                      label: const Text(
+                                        'STOP & SUBMIT',
+                                        style: TextStyle(fontFamily: 'Space Mono', fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                ]
+                              else ...
+                                [
+                                  // Mic circle button
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () => _navigateToTest(context, VitalTestType.voice),
+                                        onLongPress: () => _forcePassSensor(VitalTestType.voice),
+                                        child: Container(
+                                          width: 80.0,
+                                          height: 80.0,
+                                          decoration: BoxDecoration(
+                                            color: triageState.isCompleted(VitalTestType.voice)
+                                                ? _completedBg
+                                                : Colors.white,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: triageState.isCompleted(VitalTestType.voice)
+                                                  ? _completedGreen
+                                                  : _borderGray,
+                                              width: triageState.isCompleted(VitalTestType.voice) ? 2.0 : 1.0,
+                                            ),
+                                            boxShadow: const [
+                                              BoxShadow(
+                                                color: Color(0x0D000000),
+                                                blurRadius: 4,
+                                                offset: Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            triageState.isCompleted(VitalTestType.voice)
+                                                ? Icons.check_circle
+                                                : Icons.mic,
+                                            color: triageState.isCompleted(VitalTestType.voice)
+                                                ? _completedGreen
+                                                : _primaryContainer,
+                                            size: 38,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Hold to Force Pass',
+                                    style: TextStyle(
+                                      fontFamily: 'Space Mono',
+                                      fontSize: 10,
+                                      color: Color(0xFF737686),
+                                    ),
+                                  ),
+                                  if (triageProvider.patientTranscript.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8.0, left: 8.0, right: 8.0),
+                                      child: Text(
+                                        triageProvider.patientTranscript,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontFamily: 'Space Mono',
+                                          fontSize: 11,
+                                          color: _completedGreen,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                            ],
                           ),
                           const SizedBox(height: 6),
                         ],
@@ -594,7 +763,9 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     );
   }
 
-  /// Helper to build Vital Card matching HTML spec with tap interaction
+  /// Helper to build Vital Card matching HTML spec with tap + long-press interaction.
+  /// Long-pressing a card triggers Force Pass — injects a valid random reading
+  /// for that sensor only, leaving all other sensor values and triage logic intact.
   Widget _buildCard({
     required bool isCompleted,
     required IconData icon,
@@ -602,6 +773,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     required String sensor,
     required String? reading,
     required VoidCallback onTap,
+    required VoidCallback onForcePass,
   }) {
     return Material(
       color: isCompleted ? _completedBg : _surfaceContainerLowest,
@@ -614,6 +786,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        onLongPress: isCompleted ? null : onForcePass,
         child: SizedBox.expand(
           child: Padding(
             padding: const EdgeInsets.all(12.0),
@@ -642,7 +815,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                   ),
                 ),
                 Text(
-                  isCompleted ? 'Tap to retake' : sensor,
+                  isCompleted ? 'Tap to retake' : 'Hold to Force Pass',
                   style: TextStyle(
                     fontFamily: 'Space Mono',
                     fontSize: 10,

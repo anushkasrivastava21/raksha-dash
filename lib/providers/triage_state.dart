@@ -88,6 +88,7 @@ class TriageState extends ChangeNotifier {
     for (final type in VitalTestType.values) {
       _cardStatuses[type] = TestCardStatus.empty;
     }
+    _readings.clear();
     notifyListeners();
   }
 }

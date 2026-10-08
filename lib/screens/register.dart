@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/triage_provider.dart';
 import '../widgets/app_header.dart';
 import 'hardware_vitals_screen.dart';
 
@@ -38,11 +40,19 @@ class RakshaPatientRegistrationScreen extends StatefulWidget {
 class _RakshaPatientRegistrationScreenState
     extends State<RakshaPatientRegistrationScreen> {
   String? _selectedGender;
+  late String _currentPatientId;
 
   @override
   void initState() {
     super.initState();
     _selectedGender = widget.selectedGender;
+    
+    // Auto-generate a dynamic ID if it was passed the hardcoded default
+    if (widget.patientId == 'PT-27609' || widget.patientId.isEmpty) {
+      _currentPatientId = 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+    } else {
+      _currentPatientId = widget.patientId;
+    }
   }
 
   // Core Brand Colors
@@ -132,7 +142,7 @@ class _RakshaPatientRegistrationScreenState
         ),
         const SizedBox(height: 4),
         Text(
-          'System Generated Patient ID: ${widget.patientId}',
+          'System Generated Patient ID: $_currentPatientId',
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: outlineGray,
@@ -369,6 +379,23 @@ class _RakshaPatientRegistrationScreenState
           height: 56.0,
           child: ElevatedButton(
             onPressed: () {
+              // Extract values from form fields
+              final name = widget.nameController?.text ?? '';
+              final ageStr = widget.ageController?.text ?? '';
+              final age = int.tryParse(ageStr) ?? 0;
+              final gender = _selectedGender ?? '';
+              final phone = widget.aadhaarController?.text ?? ''; // Using Aadhaar field temporarily as it's the closest identifier
+
+              // Update the global provider with the captured registration data
+              final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+              triageProvider.setPatientInfo(PatientInfo(
+                id: _currentPatientId,
+                name: name.isEmpty ? 'Unknown Patient' : name,
+                age: age,
+                gender: gender,
+                phone: phone,
+              ));
+
               if (widget.onProceedPressed != null) {
                 widget.onProceedPressed!();
               } else {

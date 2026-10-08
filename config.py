@@ -163,7 +163,7 @@ class DatasetConfig:
     """Remote mock-payload source used by test_pipeline.py."""
     url: str = _resolve(
         "dataset", "url",
-        "https://raw.githubusercontent.com/raksha-sim/mock-data/main/esp32_payloads.json",
+        "http://172.16.46.141:8000",
         str,
     )
     timeout_s: float = _resolve("dataset", "timeout_s", 10.0, float)
