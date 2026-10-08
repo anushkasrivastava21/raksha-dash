@@ -76,7 +76,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
         // Temp: 36.6–37.2°C
         final temp = (366 + (rng % 7)) / 10.0;
         triageProvider.updateFromBleJson('TEMP', '{"body_temp_c":$temp}');
-        triageState.markCompleted(VitalTestType.temp, reading: '${temp}°C');
+        triageState.markCompleted(VitalTestType.temp, reading: '$temp°C');
         break;
       case VitalTestType.urine:
         // Urine: healthy pale yellow
