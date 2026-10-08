@@ -197,6 +197,7 @@ void stepTempSequence() {
   g_tempC = 36.7; 
   g_tempReady = true;
   sendPacket("TEMP|{\"body_temp_c\":36.7}|CRC");
+  Serial.println("g_tempReady = true");
 }
 
 void stepEcgSequence() {
@@ -204,6 +205,7 @@ void stepEcgSequence() {
   for(int i=0; i<20; i++) g_ecgSamples[i] = 1850 + (i*10); // Mock wave
   g_ecgReady = true;
   sendPacket("ECG|{\"heart_rate_bpm\":78,\"samples\":[1850,1860,1870,1880]}|CRC");
+  Serial.println("g_ecgReady = true");
 }
 
 void stepSpo2Sequence() {
@@ -211,18 +213,21 @@ void stepSpo2Sequence() {
   g_spo2Pct = 98.0;
   g_spo2Ready = true;
   sendPacket("SPO2|{\"spo2_percent\":98.0,\"heart_rate_bpm\":72}|CRC");
+  Serial.println("g_spo2Ready = true");
 }
 
 void stepUrineSequence() {
   g_urineR = 3300; g_urineG = 3250; g_urineB = 3400;
   g_urineReady = true;
   sendPacket("URINE|{\"red\":3300,\"green\":3250,\"blue\":3400}|CRC");
+  Serial.println("g_urineReady = true");
 }
 
 void stepStethSequence() {
   g_stethRms = 220; g_stethMin = 1500; g_stethMax = 2600;
   g_stethReady = true;
   sendPacket("STETH|{\"rms\":220,\"min\":1500,\"max\":2600,\"samples\":50}|CRC");
+  Serial.println("g_stethReady = true");
 }
 
 // ---------------------------------------------------------

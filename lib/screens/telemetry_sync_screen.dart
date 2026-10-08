@@ -5,7 +5,6 @@ import '../providers/triage_provider.dart';
 import '../providers/triage_state.dart';
 import '../services/ble_service.dart';
 import '../widgets/app_header.dart';
-import 'dashboard_completed_screen.dart';
 
 /// Configuration data model representing loading information for a specific vital test.
 class TestLoadingConfig {

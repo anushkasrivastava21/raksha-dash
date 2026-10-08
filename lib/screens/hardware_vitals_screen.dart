@@ -317,7 +317,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
           if (mounted) {
             setState(() {
               if (_liveTranscript.isNotEmpty) {
-                _liveTranscript += " " + transcript;
+                _liveTranscript += " $transcript";
               } else {
                 _liveTranscript = transcript;
               }
