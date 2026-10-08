@@ -1,4 +1,4 @@
-"""Fetch mock ESP32 payloads from a remote endpoint instead of hardcoding them."""
+"""Fetch real ESP32 payloads from the hardware endpoint instead of mocked data."""
 from __future__ import annotations
 
 import json
@@ -83,7 +83,7 @@ def _read_cache() -> List[Dict[str, Any]]:
 
 
 def fetch_payloads(url: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Return mock ESP32 payloads, falling back to the local cache if offline."""
+    """Return real ESP32 payloads from the hardware endpoint, falling back to cache if offline."""
     try:
         return _download(url or CFG.url)
     except DatasetUnavailable:

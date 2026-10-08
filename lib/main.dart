@@ -72,7 +72,7 @@ class RakshaApp extends StatelessWidget {
           useMaterial3: false,
           scaffoldBackgroundColor: Colors.white,
         ),
-        initialRoute: isAuthenticated ? '/dashboard' : '/login',
+        initialRoute: isAuthenticated ? '/home' : '/login',
         routes: {
           '/login': (context) => const AshaLoginScreen(),
           '/dashboard': (context) => const RakshaHardwareVitalsScreen(),

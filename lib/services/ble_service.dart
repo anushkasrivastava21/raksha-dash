@@ -67,10 +67,14 @@ class BleService {
                   await _device!.connect(autoConnect: false);
                   debugPrint('BLE connected to ${_device!.platformName}');
                   
-                  // Negotiate High MTU immediately to minimize fragmentation
+                  // Negotiate exact 247 MTU to match ESP32 BLE_PREFERRED_MTU (prevents ECG packet drops)
                   if (Platform.isAndroid) {
-                    await _device!.requestMtu(512);
-                    debugPrint('MTU negotiated up to 512');
+                    try {
+                      await _device!.requestMtu(247);
+                      debugPrint('MTU negotiated to 247 (matching ESP32 BLE_PREFERRED_MTU)');
+                    } catch (e) {
+                      debugPrint('MTU request warning: $e');
+                    }
                   }
                   
                   _connectionStateController.add(true);
@@ -179,73 +183,76 @@ class BleService {
   Future<void> _subscribeToTxCharacteristic() async {
     if (_txCharacteristic == null) return;
     
-    await _txCharacteristic!.setNotifyValue(true);
-    _notifySub = _txCharacteristic!.lastValueStream.listen((value) {
-      if (value.isEmpty) return;
+    // [FIX]: Subscribe to the stream BEFORE enabling notifications on the hardware.
+    // ESP32 might blast data the millisecond CCCD 0x2902 is set to 1.
+    _notifySub = _txCharacteristic!.onValueReceived.listen((rawBytes) {
+      if (rawBytes.isEmpty) return;
       
-      // Implement Custom Chunking Parser
-      int header = value[0];
-      int totalChunks = header >> 4;
-      int chunkIndex = header & 0x0F;
+      // ── Step 1: Parse the chunk header byte ──
+      final headerByte = rawBytes[0];
+      final totalChunks = (headerByte >> 4) & 0x0F;
+      final chunkIndex  = headerByte & 0x0F;
 
       if (totalChunks == 0) return; // Invalid header
       
-      // Reset buffer if this is the start of a new packet sequence
+      // ── Step 2: Store chunk payload (bytes after header) ──
       if (_expectedChunks == 0 || _expectedChunks != totalChunks || chunkIndex == 0) {
         _chunkBuffer.clear();
         _expectedChunks = totalChunks;
       }
       
-      // Store payload fragment (strip byte[0] header)
-      _chunkBuffer[chunkIndex] = value.sublist(1);
+      _chunkBuffer[chunkIndex] = rawBytes.sublist(1);
       
-      // Check if all chunks have arrived
-      if (_chunkBuffer.length == totalChunks) {
-        List<int> fullPayload = [];
-        for (int i = 0; i < totalChunks; i++) {
-          if (_chunkBuffer.containsKey(i)) {
-            fullPayload.addAll(_chunkBuffer[i]!);
-          } else {
-            debugPrint('Missing chunk index $i, dropping packet.');
-            _chunkBuffer.clear();
-            _expectedChunks = 0;
-            return;
-          }
+      // ── Step 3: Check if all chunks received ──
+      if (_chunkBuffer.length < totalChunks) return;
+      
+      // ── Step 4: Reassemble in order ──
+      List<int> fullPayload = [];
+      for (int i = 0; i < totalChunks; i++) {
+        if (_chunkBuffer.containsKey(i)) {
+          fullPayload.addAll(_chunkBuffer[i]!);
+        } else {
+          debugPrint('Missing chunk index $i, dropping packet.');
+          _chunkBuffer.clear();
+          _expectedChunks = 0;
+          return;
         }
-        
-        _chunkBuffer.clear();
-        _expectedChunks = 0;
-        
-        _processReassembledPayload(fullPayload);
       }
+      
+      _chunkBuffer.clear();
+      _expectedChunks = 0;
+      
+      _processReassembledPayload(fullPayload);
     });
+
+    if (_txCharacteristic!.properties.notify) {
+      await _txCharacteristic!.setNotifyValue(true);
+      debugPrint('BLE: TX notify subscribed');
+    }
   }
 
   void _processReassembledPayload(List<int> payloadBytes) {
     try {
-      String rawStr = utf8.decode(payloadBytes);
+      final String fullPacket = utf8.decode(payloadBytes, allowMalformed: true).trim();
       
-      // Format: <SENSOR_CODE> | <json_payload> | <CRC8_hex>
-      List<String> parts = rawStr.split('|').map((e) => e.trim()).toList();
+      // ── Step 6: Validate & strip CRC8 ──
+      // Packet format: "SENSOR_CODE|{json}|CRC8hex"
+      final int lastPipe = fullPacket.lastIndexOf('|');
+      if (lastPipe < 0) return;
+
+      final String dataWithoutCrc = fullPacket.substring(0, lastPipe);
+      final String crcHex = fullPacket.substring(lastPipe + 1);
       
-      if (parts.length >= 3) {
-        String sensorCode = parts[0];
-        String jsonPayload = parts[1];
-        String crcHex = parts[2];
-        
-        // Local CRC8 validation on json_payload
-        int computedCrc = _computeCrc8(utf8.encode(jsonPayload));
-        int receivedCrc = int.parse(crcHex, radix: 16);
-        
-        if (computedCrc == receivedCrc) {
-          debugPrint('Valid Packet - Sensor: $sensorCode, Data: $jsonPayload');
-          // Pass valid raw data downstream to UI
-          _rawDataController.add(rawStr);
-        } else {
-          debugPrint('CRC mismatch! Computed: 0x${computedCrc.toRadixString(16)}, Received: 0x$crcHex');
-        }
+      // Local CRC8 validation on SENSOR_CODE|{json}
+      int computedCrc = _computeCrc8(utf8.encode(dataWithoutCrc));
+      int receivedCrc = int.parse(crcHex, radix: 16);
+      
+      if (computedCrc == receivedCrc) {
+        debugPrint('Valid Packet: $dataWithoutCrc');
+        // ── Step 7: Emit clean "SENSOR_CODE|{json}" to rawDataStream ──
+        _rawDataController.add(dataWithoutCrc);
       } else {
-        debugPrint('Malformed payload structure: $rawStr');
+        debugPrint('CRC mismatch! Computed: 0x${computedCrc.toRadixString(16)}, Received: 0x$crcHex');
       }
     } catch (e) {
       debugPrint('Failed to process reassembled payload: $e');
@@ -271,11 +278,26 @@ class BleService {
 
   Future<void> sendCommand(String cmd) async {
     if (_rxCharacteristic != null && isConnected) {
+      final props = _rxCharacteristic!.properties;
+      final bool canWriteNoResponse = props.writeWithoutResponse;
       try {
-        await _rxCharacteristic!.write(utf8.encode(cmd), withoutResponse: false);
-        debugPrint('Sent command: $cmd');
+        await _rxCharacteristic!.write(
+          utf8.encode(cmd),
+          withoutResponse: canWriteNoResponse,
+        );
+        debugPrint('Sent command: $cmd (withoutResponse: $canWriteNoResponse)');
       } catch (e) {
-        debugPrint('Failed to send command: $e');
+        debugPrint('Failed to send command with withoutResponse=$canWriteNoResponse: $e');
+        try {
+          // Fallback to the opposite transaction type defensively
+          await _rxCharacteristic!.write(
+            utf8.encode(cmd),
+            withoutResponse: !canWriteNoResponse,
+          );
+          debugPrint('Sent command with fallback withoutResponse=${!canWriteNoResponse}');
+        } catch (fallbackErr) {
+          debugPrint('BLE fallback write failed: $fallbackErr');
+        }
       }
     }
   }

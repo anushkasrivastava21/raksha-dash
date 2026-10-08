@@ -96,6 +96,42 @@ class ApiService {
     return resolved;
   }
 
+  /// Dedicated method to connect directly to Anirudh's ML Engine (/predict)
+  /// for symptom validation and risk assessment.
+  static Future<Map<String, dynamic>?> predictWithMlEngine({
+    required String patientId,
+    required String patientSpeechText,
+    double? ecgHr,
+    double? spo2,
+    double? temperature,
+    List<double>? urineRgb,
+  }) async {
+    final Map<String, dynamic> payload = {
+      'patient_id': patientId,
+      'patient_speech_text': patientSpeechText,
+      'ecg_hr': ?ecgHr,
+      'spo2': ?spo2,
+      'temperature': ?temperature,
+      'urine_rgb': ?urineRgb,
+    };
+
+    final Uri uri = Uri.parse('$mlEngineUrl/predict');
+    try {
+      debugPrint('🧠 [ApiService] Calling Anirudh ML Engine -> $uri');
+      final response = await _safePost(uri, jsonEncode(payload));
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body) as Map<String, dynamic>;
+        debugPrint('✅ [ApiService] Anirudh ML Engine returned: $result');
+        return result;
+      } else {
+        debugPrint('⚠️ [ApiService] ML Engine returned HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [ApiService] Anirudh ML Engine unreachable ($e). Operating in offline edge mode.');
+    }
+    return null;
+  }
+
   /// Dedicated method to save vitals & triage data DIRECTLY to Cloud Backend
   /// (https://raksha-api-71a6.onrender.com), regardless of useLocalServer mode.
   static Future<SaveToCloudResult> saveToCloud(Map<String, dynamic> payload) async {

@@ -1,0 +1,1368 @@
+{
+ "_comment": "canonical symptom -> {tier, variants}. tier drives triage escalation weight.",
+ "negation": {
+  "_note": "English cues precede the symptom ('no chest pain'); Hindi cues follow it ('dard nahi hai').",
+  "prefix_cues": [
+   "no",
+   "not",
+   "without",
+   "denies",
+   "denied",
+   "never",
+   "negative",
+   "free of"
+  ],
+  "prefix_window_tokens": 4,
+  "suffix_cues": [
+   "nahi",
+   "nahin",
+   "nai",
+   "na"
+  ],
+  "suffix_window_tokens": 3
+ },
+ "symptoms": {
+  "chest pain": {
+   "tier": "critical",
+   "variants": [
+    "chaati me bojh",
+    "chati bhari",
+    "chati me dard",
+    "chest me dard",
+    "chest pain",
+    "chest pressure",
+    "chest tightness",
+    "seena dard",
+    "seene me dard",
+    "seene mein dard"
+   ]
+  },
+  "shortness of breath": {
+   "tier": "critical",
+   "variants": [
+    "breathlessness",
+    "dam ghutna",
+    "difficulty breathing",
+    "dyspnea",
+    "saans atakna",
+    "saans lene me pareshani",
+    "saans lene mein takleef",
+    "saans me dikkat",
+    "saans phulna",
+    "sas phulna",
+    "shortness of breath"
+   ]
+  },
+  "unconscious": {
+   "tier": "critical",
+   "variants": [
+    "behosh",
+    "behoshi",
+    "behosi",
+    "coma",
+    "unconscious",
+    "unresponsive"
+   ]
+  },
+  "seizure": {
+   "tier": "critical",
+   "variants": [
+    "convulsion",
+    "daura",
+    "fits",
+    "jhatke",
+    "mirgi",
+    "seizure"
+   ]
+  },
+  "coughing up blood": {
+   "tier": "critical",
+   "variants": [
+    "coughing up blood",
+    "hemoptysis",
+    "khansi me khoon",
+    "khoon ki khansi"
+   ]
+  },
+  "vomiting blood": {
+   "tier": "critical",
+   "variants": [
+    "hematemesis",
+    "khoon ki ulti",
+    "muh se khoon",
+    "ulti me khoon",
+    "vomiting blood"
+   ]
+  },
+  "slurred speech": {
+   "tier": "critical",
+   "variants": [
+    "aphasia",
+    "awaaz ladkhadana",
+    "bolne me lafz tutna",
+    "bolne me takleef",
+    "slurred speech",
+    "speech difficulty",
+    "zubaan ladkhadana"
+   ]
+  },
+  "paralysis": {
+   "tier": "critical",
+   "variants": [
+    "ek taraf kamzori",
+    "lakwa",
+    "lakwa marna",
+    "muh tedha hona",
+    "paralysis"
+   ]
+  },
+  "severe bleeding": {
+   "tier": "critical",
+   "variants": [
+    "bahut khoon",
+    "heavy bleeding",
+    "khoon behna",
+    "khoon nahi ruk raha",
+    "severe bleeding"
+   ]
+  },
+  "cyanosis": {
+   "tier": "critical",
+   "variants": [
+    "blue lips",
+    "blue skin",
+    "cyanosis",
+    "hoth neele",
+    "neela padna"
+   ]
+  },
+  "choking": {
+   "tier": "critical",
+   "variants": [
+    "choking",
+    "gala ruk gaya",
+    "nigalne me rukawat"
+   ]
+  },
+  "fainting": {
+   "tier": "critical",
+   "variants": [
+    "behosh ho gaya",
+    "faint",
+    "fainting",
+    "gir gaya",
+    "presyncope",
+    "syncope"
+   ]
+  },
+  "confusion": {
+   "tier": "critical",
+   "variants": [
+    "confusion",
+    "disorientation",
+    "hosh me nahi",
+    "samajhne me takleef"
+   ]
+  },
+  "numbness": {
+   "tier": "moderate",
+   "variants": [
+    "jhanjhanahat",
+    "numbness",
+    "sun ho gaya",
+    "sunn padna",
+    "tingling"
+   ]
+  },
+  "palpitations": {
+   "tier": "moderate",
+   "variants": [
+    "dhadkan tez",
+    "dil ki dhadkan rukna",
+    "fast heart rate",
+    "irregular heartbeat",
+    "palpitations",
+    "slow heart rate",
+    "tez dhadkan"
+   ]
+  },
+  "fever": {
+   "tier": "moderate",
+   "variants": [
+    "bukhaar",
+    "bukhar",
+    "bukhar lagna",
+    "chills",
+    "fever",
+    "high temperature",
+    "kampa kampi",
+    "kappkappi",
+    "thand lagna"
+   ]
+  },
+  "vomiting": {
+   "tier": "moderate",
+   "variants": [
+    "ulti",
+    "ulti aana",
+    "ulti ho rahi",
+    "ultiyan",
+    "vomiting"
+   ]
+  },
+  "nausea": {
+   "tier": "moderate",
+   "variants": [
+    "jee machalna",
+    "matli",
+    "matli hona",
+    "nausea",
+    "ubkai"
+   ]
+  },
+  "dizziness": {
+   "tier": "moderate",
+   "variants": [
+    "chakkar",
+    "chakkar aana",
+    "dizziness",
+    "dizzy",
+    "lightheadedness",
+    "sir ghumna",
+    "vertigo"
+   ]
+  },
+  "abdominal pain": {
+   "tier": "moderate",
+   "variants": [
+    "abdominal pain",
+    "pet dard",
+    "pet me dard",
+    "pet me marod",
+    "stomach ache"
+   ]
+  },
+  "headache": {
+   "tier": "moderate",
+   "variants": [
+    "headache",
+    "sar dard",
+    "sir bhari hona",
+    "sir dard"
+   ]
+  },
+  "weakness": {
+   "tier": "moderate",
+   "variants": [
+    "asthenia",
+    "fatigue",
+    "kamjori",
+    "kamsori",
+    "kamzori",
+    "lethargy",
+    "malaise",
+    "thakaan",
+    "thakan",
+    "thakawat",
+    "weakness"
+   ]
+  },
+  "blood in urine": {
+   "tier": "moderate",
+   "variants": [
+    "blood in urine",
+    "hematuria",
+    "peshab me khoon"
+   ]
+  },
+  "bloody stool": {
+   "tier": "moderate",
+   "variants": [
+    "black stool",
+    "bloody stool",
+    "hematochezia",
+    "khuni dast",
+    "mal me khoon",
+    "melena"
+   ]
+  },
+  "unable to urinate": {
+   "tier": "moderate",
+   "variants": [
+    "anuria",
+    "inability to urinate",
+    "peshab nahi aa raha",
+    "retention",
+    "unable to urinate"
+   ]
+  },
+  "swelling": {
+   "tier": "moderate",
+   "variants": [
+    "ascites",
+    "edema",
+    "sujan",
+    "sujan aana",
+    "swelling"
+   ]
+  },
+  "sweating": {
+   "tier": "moderate",
+   "variants": [
+    "clammy skin",
+    "cold sweat",
+    "night sweats",
+    "pasina",
+    "pasina aana",
+    "sweating",
+    "thanda pasina"
+   ]
+  },
+  "wheezing": {
+   "tier": "moderate",
+   "variants": [
+    "seeti ki awaaz",
+    "wheezing"
+   ]
+  },
+  "blurred vision": {
+   "tier": "moderate",
+   "variants": [
+    "blurred vision",
+    "dhundhla dikhna",
+    "kam dikhna"
+   ]
+  },
+  "dark urine": {
+   "tier": "moderate",
+   "variants": [
+    "dark urine",
+    "gehra peshab",
+    "peshab gehra"
+   ]
+  },
+  "painful urination": {
+   "tier": "moderate",
+   "variants": [
+    "dysuria",
+    "painful urination",
+    "peshab me jalan"
+   ]
+  },
+  "diarrhea": {
+   "tier": "moderate",
+   "variants": [
+    "dast",
+    "dast lagna",
+    "diarrhea",
+    "loose motion",
+    "pechis"
+   ]
+  },
+  "dehydration": {
+   "tier": "moderate",
+   "variants": [
+    "dehydration",
+    "dry mouth",
+    "increased thirst",
+    "muh sookhna",
+    "polydipsia",
+    "pyas lagna",
+    "xerostomia"
+   ]
+  },
+  "cough": {
+   "tier": "minor",
+   "variants": [
+    "balgam",
+    "cough",
+    "kaph",
+    "khansi",
+    "sookhi khansi"
+   ]
+  },
+  "sore throat": {
+   "tier": "minor",
+   "variants": [
+    "gala baithna",
+    "gala dard",
+    "gala kharab",
+    "gale mein dard",
+    "sore throat"
+   ]
+  },
+  "back pain": {
+   "tier": "minor",
+   "variants": [
+    "back pain",
+    "kamar dard",
+    "kamar dukhna"
+   ]
+  },
+  "joint pain": {
+   "tier": "minor",
+   "variants": [
+    "arthralgia",
+    "badan dard",
+    "jodo me dard",
+    "jodon mein dard",
+    "joint pain",
+    "muscle ache",
+    "myalgia"
+   ]
+  },
+  "rash": {
+   "tier": "minor",
+   "variants": [
+    "daane",
+    "daane nikalna",
+    "hives",
+    "itching",
+    "khujali",
+    "khujli",
+    "rash"
+   ]
+  },
+  "runny nose": {
+   "tier": "minor",
+   "variants": [
+    "congestion",
+    "naak behna",
+    "runny nose",
+    "sardi",
+    "sardi jukham",
+    "zukam"
+   ]
+  },
+  "aankho me dard": {
+   "tier": "minor",
+   "variants": [
+    "aankho me dard"
+   ]
+  },
+  "aawaz baithna": {
+   "tier": "minor",
+   "variants": [
+    "aawaz baithna"
+   ]
+  },
+  "acid reflux": {
+   "tier": "minor",
+   "variants": [
+    "acid reflux"
+   ]
+  },
+  "alopecia": {
+   "tier": "minor",
+   "variants": [
+    "alopecia"
+   ]
+  },
+  "anasarca": {
+   "tier": "minor",
+   "variants": [
+    "anasarca"
+   ]
+  },
+  "ankhon me dard": {
+   "tier": "minor",
+   "variants": [
+    "ankhon me dard"
+   ]
+  },
+  "anorexia": {
+   "tier": "minor",
+   "variants": [
+    "anorexia"
+   ]
+  },
+  "apnea": {
+   "tier": "minor",
+   "variants": [
+    "apnea"
+   ]
+  },
+  "baal jhadna": {
+   "tier": "minor",
+   "variants": [
+    "baal jhadna"
+   ]
+  },
+  "bar bar peshab aana": {
+   "tier": "minor",
+   "variants": [
+    "bar bar peshab aana"
+   ]
+  },
+  "bawasir": {
+   "tier": "minor",
+   "variants": [
+    "bawasir"
+   ]
+  },
+  "bawasir hona": {
+   "tier": "minor",
+   "variants": [
+    "bawasir hona"
+   ]
+  },
+  "behrapan": {
+   "tier": "minor",
+   "variants": [
+    "behrapan"
+   ]
+  },
+  "bhukh na lagna": {
+   "tier": "minor",
+   "variants": [
+    "bhukh na lagna"
+   ]
+  },
+  "bhulne ki bimari": {
+   "tier": "minor",
+   "variants": [
+    "bhulne ki bimari"
+   ]
+  },
+  "bleeding": {
+   "tier": "minor",
+   "variants": [
+    "bleeding"
+   ]
+  },
+  "bleeding gums": {
+   "tier": "minor",
+   "variants": [
+    "bleeding gums"
+   ]
+  },
+  "bloating": {
+   "tier": "minor",
+   "variants": [
+    "bloating"
+   ]
+  },
+  "blood": {
+   "tier": "minor",
+   "variants": [
+    "blood"
+   ]
+  },
+  "bruising": {
+   "tier": "minor",
+   "variants": [
+    "bruising"
+   ]
+  },
+  "bulla": {
+   "tier": "minor",
+   "variants": [
+    "bulla"
+   ]
+  },
+  "burning sensation": {
+   "tier": "minor",
+   "variants": [
+    "burning sensation"
+   ]
+  },
+  "cachexia": {
+   "tier": "minor",
+   "variants": [
+    "cachexia"
+   ]
+  },
+  "chaale": {
+   "tier": "minor",
+   "variants": [
+    "chaale"
+   ]
+  },
+  "chale padna": {
+   "tier": "minor",
+   "variants": [
+    "chale padna"
+   ]
+  },
+  "charley horse": {
+   "tier": "minor",
+   "variants": [
+    "charley horse"
+   ]
+  },
+  "chhala": {
+   "tier": "minor",
+   "variants": [
+    "chhala"
+   ]
+  },
+  "chot": {
+   "tier": "minor",
+   "variants": [
+    "chot"
+   ]
+  },
+  "chot lagna": {
+   "tier": "minor",
+   "variants": [
+    "chot lagna"
+   ]
+  },
+  "claudication": {
+   "tier": "minor",
+   "variants": [
+    "claudication"
+   ]
+  },
+  "clubbing": {
+   "tier": "minor",
+   "variants": [
+    "clubbing"
+   ]
+  },
+  "cold flashes": {
+   "tier": "minor",
+   "variants": [
+    "cold flashes"
+   ]
+  },
+  "constipation": {
+   "tier": "minor",
+   "variants": [
+    "constipation"
+   ]
+  },
+  "cramp": {
+   "tier": "minor",
+   "variants": [
+    "cramp"
+   ]
+  },
+  "cramping": {
+   "tier": "minor",
+   "variants": [
+    "cramping"
+   ]
+  },
+  "crusting": {
+   "tier": "minor",
+   "variants": [
+    "crusting"
+   ]
+  },
+  "daant dard": {
+   "tier": "minor",
+   "variants": [
+    "daant dard"
+   ]
+  },
+  "daant dukhna": {
+   "tier": "minor",
+   "variants": [
+    "daant dukhna"
+   ]
+  },
+  "dard": {
+   "tier": "minor",
+   "variants": [
+    "dard"
+   ]
+  },
+  "difficulty swallowing": {
+   "tier": "minor",
+   "variants": [
+    "difficulty swallowing"
+   ]
+  },
+  "dil ki bimari": {
+   "tier": "minor",
+   "variants": [
+    "dil ki bimari"
+   ]
+  },
+  "drooling": {
+   "tier": "minor",
+   "variants": [
+    "drooling"
+   ]
+  },
+  "dry eyes": {
+   "tier": "minor",
+   "variants": [
+    "dry eyes"
+   ]
+  },
+  "dry skin": {
+   "tier": "minor",
+   "variants": [
+    "dry skin"
+   ]
+  },
+  "dull ache": {
+   "tier": "minor",
+   "variants": [
+    "dull ache"
+   ]
+  },
+  "dysphagia": {
+   "tier": "minor",
+   "variants": [
+    "dysphagia"
+   ]
+  },
+  "earache": {
+   "tier": "minor",
+   "variants": [
+    "earache"
+   ]
+  },
+  "ecchymosis": {
+   "tier": "minor",
+   "variants": [
+    "ecchymosis"
+   ]
+  },
+  "erosion": {
+   "tier": "minor",
+   "variants": [
+    "erosion"
+   ]
+  },
+  "erythema": {
+   "tier": "minor",
+   "variants": [
+    "erythema"
+   ]
+  },
+  "fissure": {
+   "tier": "minor",
+   "variants": [
+    "fissure"
+   ]
+  },
+  "flatulence": {
+   "tier": "minor",
+   "variants": [
+    "flatulence"
+   ]
+  },
+  "frequent urination": {
+   "tier": "minor",
+   "variants": [
+    "frequent urination"
+   ]
+  },
+  "galon me dard": {
+   "tier": "minor",
+   "variants": [
+    "galon me dard"
+   ]
+  },
+  "gardan akadna": {
+   "tier": "minor",
+   "variants": [
+    "gardan akadna"
+   ]
+  },
+  "gardan dard": {
+   "tier": "minor",
+   "variants": [
+    "gardan dard"
+   ]
+  },
+  "gardan me dard": {
+   "tier": "minor",
+   "variants": [
+    "gardan me dard"
+   ]
+  },
+  "gas": {
+   "tier": "minor",
+   "variants": [
+    "gas"
+   ]
+  },
+  "gas banna": {
+   "tier": "minor",
+   "variants": [
+    "gas banna"
+   ]
+  },
+  "ghabrahat": {
+   "tier": "minor",
+   "variants": [
+    "ghabrahat"
+   ]
+  },
+  "ghutno mein dard": {
+   "tier": "minor",
+   "variants": [
+    "ghutno mein dard"
+   ]
+  },
+  "haath dard": {
+   "tier": "minor",
+   "variants": [
+    "haath dard"
+   ]
+  },
+  "halitosis": {
+   "tier": "minor",
+   "variants": [
+    "halitosis"
+   ]
+  },
+  "hearing loss": {
+   "tier": "minor",
+   "variants": [
+    "hearing loss"
+   ]
+  },
+  "heartburn": {
+   "tier": "minor",
+   "variants": [
+    "heartburn"
+   ]
+  },
+  "hot flashes": {
+   "tier": "minor",
+   "variants": [
+    "hot flashes"
+   ]
+  },
+  "hypersomnia": {
+   "tier": "minor",
+   "variants": [
+    "hypersomnia"
+   ]
+  },
+  "hyperventilation": {
+   "tier": "minor",
+   "variants": [
+    "hyperventilation"
+   ]
+  },
+  "hypoventilation": {
+   "tier": "minor",
+   "variants": [
+    "hypoventilation"
+   ]
+  },
+  "incontinence": {
+   "tier": "minor",
+   "variants": [
+    "incontinence"
+   ]
+  },
+  "increased hunger": {
+   "tier": "minor",
+   "variants": [
+    "increased hunger"
+   ]
+  },
+  "indigestion": {
+   "tier": "minor",
+   "variants": [
+    "indigestion"
+   ]
+  },
+  "insomnia": {
+   "tier": "minor",
+   "variants": [
+    "insomnia"
+   ]
+  },
+  "irregular periods": {
+   "tier": "minor",
+   "variants": [
+    "irregular periods"
+   ]
+  },
+  "jalan": {
+   "tier": "minor",
+   "variants": [
+    "jalan"
+   ]
+  },
+  "jalan hona": {
+   "tier": "minor",
+   "variants": [
+    "jalan hona"
+   ]
+  },
+  "jaundice": {
+   "tier": "minor",
+   "variants": [
+    "jaundice"
+   ]
+  },
+  "jaw pain": {
+   "tier": "minor",
+   "variants": [
+    "jaw pain"
+   ]
+  },
+  "jhadna": {
+   "tier": "minor",
+   "variants": [
+    "jhadna"
+   ]
+  },
+  "kaan bajna": {
+   "tier": "minor",
+   "variants": [
+    "kaan bajna"
+   ]
+  },
+  "kaan behna": {
+   "tier": "minor",
+   "variants": [
+    "kaan behna"
+   ]
+  },
+  "kaan me dard": {
+   "tier": "minor",
+   "variants": [
+    "kaan me dard"
+   ]
+  },
+  "kaan se pani aana": {
+   "tier": "minor",
+   "variants": [
+    "kaan se pani aana"
+   ]
+  },
+  "kabj": {
+   "tier": "minor",
+   "variants": [
+    "kabj"
+   ]
+  },
+  "khana na pachna": {
+   "tier": "minor",
+   "variants": [
+    "khana na pachna"
+   ]
+  },
+  "khatti dakar": {
+   "tier": "minor",
+   "variants": [
+    "khatti dakar"
+   ]
+  },
+  "khatti dakar aana": {
+   "tier": "minor",
+   "variants": [
+    "khatti dakar aana"
+   ]
+  },
+  "khoon": {
+   "tier": "minor",
+   "variants": [
+    "khoon"
+   ]
+  },
+  "khujli hona": {
+   "tier": "minor",
+   "variants": [
+    "khujli hona"
+   ]
+  },
+  "koilonychia": {
+   "tier": "minor",
+   "variants": [
+    "koilonychia"
+   ]
+  },
+  "laal hona": {
+   "tier": "minor",
+   "variants": [
+    "laal hona"
+   ]
+  },
+  "laal nishan": {
+   "tier": "minor",
+   "variants": [
+    "laal nishan"
+   ]
+  },
+  "lockjaw": {
+   "tier": "minor",
+   "variants": [
+    "lockjaw"
+   ]
+  },
+  "loss of smell": {
+   "tier": "minor",
+   "variants": [
+    "loss of smell"
+   ]
+  },
+  "loss of taste": {
+   "tier": "minor",
+   "variants": [
+    "loss of taste"
+   ]
+  },
+  "macule": {
+   "tier": "minor",
+   "variants": [
+    "macule"
+   ]
+  },
+  "maspeshiyon mein dard": {
+   "tier": "minor",
+   "variants": [
+    "maspeshiyon mein dard"
+   ]
+  },
+  "masudo se khoon": {
+   "tier": "minor",
+   "variants": [
+    "masudo se khoon"
+   ]
+  },
+  "memory loss": {
+   "tier": "minor",
+   "variants": [
+    "memory loss"
+   ]
+  },
+  "moch": {
+   "tier": "minor",
+   "variants": [
+    "moch"
+   ]
+  },
+  "muscle weakness": {
+   "tier": "minor",
+   "variants": [
+    "muscle weakness"
+   ]
+  },
+  "naak se khoon": {
+   "tier": "minor",
+   "variants": [
+    "naak se khoon"
+   ]
+  },
+  "nakseer": {
+   "tier": "minor",
+   "variants": [
+    "nakseer"
+   ]
+  },
+  "narcolepsy": {
+   "tier": "minor",
+   "variants": [
+    "narcolepsy"
+   ]
+  },
+  "nas chadna": {
+   "tier": "minor",
+   "variants": [
+    "nas chadna"
+   ]
+  },
+  "nas dukhna": {
+   "tier": "minor",
+   "variants": [
+    "nas dukhna"
+   ]
+  },
+  "neck pain": {
+   "tier": "minor",
+   "variants": [
+    "neck pain"
+   ]
+  },
+  "neend kam aana": {
+   "tier": "minor",
+   "variants": [
+    "neend kam aana"
+   ]
+  },
+  "nightmares": {
+   "tier": "minor",
+   "variants": [
+    "nightmares"
+   ]
+  },
+  "nind na aana": {
+   "tier": "minor",
+   "variants": [
+    "nind na aana"
+   ]
+  },
+  "nocturia": {
+   "tier": "minor",
+   "variants": [
+    "nocturia"
+   ]
+  },
+  "oliguria": {
+   "tier": "minor",
+   "variants": [
+    "oliguria"
+   ]
+  },
+  "paer dard": {
+   "tier": "minor",
+   "variants": [
+    "paer dard"
+   ]
+  },
+  "pale skin": {
+   "tier": "minor",
+   "variants": [
+    "pale skin"
+   ]
+  },
+  "pallor": {
+   "tier": "minor",
+   "variants": [
+    "pallor"
+   ]
+  },
+  "papule": {
+   "tier": "minor",
+   "variants": [
+    "papule"
+   ]
+  },
+  "pelvic pain": {
+   "tier": "minor",
+   "variants": [
+    "pelvic pain"
+   ]
+  },
+  "pet fholna": {
+   "tier": "minor",
+   "variants": [
+    "pet fholna"
+   ]
+  },
+  "pet phulna": {
+   "tier": "minor",
+   "variants": [
+    "pet phulna"
+   ]
+  },
+  "petechiae": {
+   "tier": "minor",
+   "variants": [
+    "petechiae"
+   ]
+  },
+  "photophobia": {
+   "tier": "minor",
+   "variants": [
+    "photophobia"
+   ]
+  },
+  "pindliyon mein dard": {
+   "tier": "minor",
+   "variants": [
+    "pindliyon mein dard"
+   ]
+  },
+  "polyphagia": {
+   "tier": "minor",
+   "variants": [
+    "polyphagia"
+   ]
+  },
+  "polyuria": {
+   "tier": "minor",
+   "variants": [
+    "polyuria"
+   ]
+  },
+  "purpura": {
+   "tier": "minor",
+   "variants": [
+    "purpura"
+   ]
+  },
+  "pustule": {
+   "tier": "minor",
+   "variants": [
+    "pustule"
+   ]
+  },
+  "qabz": {
+   "tier": "minor",
+   "variants": [
+    "qabz"
+   ]
+  },
+  "raat me pasina": {
+   "tier": "minor",
+   "variants": [
+    "raat me pasina"
+   ]
+  },
+  "radiating pain": {
+   "tier": "minor",
+   "variants": [
+    "radiating pain"
+   ]
+  },
+  "restless legs": {
+   "tier": "minor",
+   "variants": [
+    "restless legs"
+   ]
+  },
+  "rigidity": {
+   "tier": "minor",
+   "variants": [
+    "rigidity"
+   ]
+  },
+  "ringing in ears": {
+   "tier": "minor",
+   "variants": [
+    "ringing in ears"
+   ]
+  },
+  "ruk ruk kar peshab aana": {
+   "tier": "minor",
+   "variants": [
+    "ruk ruk kar peshab aana"
+   ]
+  },
+  "scaling": {
+   "tier": "minor",
+   "variants": [
+    "scaling"
+   ]
+  },
+  "seene me jalan": {
+   "tier": "minor",
+   "variants": [
+    "seene me jalan"
+   ]
+  },
+  "sharp pain": {
+   "tier": "minor",
+   "variants": [
+    "sharp pain"
+   ]
+  },
+  "snoring": {
+   "tier": "minor",
+   "variants": [
+    "snoring"
+   ]
+  },
+  "somnolence": {
+   "tier": "minor",
+   "variants": [
+    "somnolence"
+   ]
+  },
+  "spasm": {
+   "tier": "minor",
+   "variants": [
+    "spasm"
+   ]
+  },
+  "stiffness": {
+   "tier": "minor",
+   "variants": [
+    "stiffness"
+   ]
+  },
+  "tenesmus": {
+   "tier": "minor",
+   "variants": [
+    "tenesmus"
+   ]
+  },
+  "throbbing pain": {
+   "tier": "minor",
+   "variants": [
+    "throbbing pain"
+   ]
+  },
+  "toothache": {
+   "tier": "minor",
+   "variants": [
+    "toothache"
+   ]
+  },
+  "tremor": {
+   "tier": "minor",
+   "variants": [
+    "tremor"
+   ]
+  },
+  "trismus": {
+   "tier": "minor",
+   "variants": [
+    "trismus"
+   ]
+  },
+  "twitching": {
+   "tier": "minor",
+   "variants": [
+    "twitching"
+   ]
+  },
+  "ulcer": {
+   "tier": "minor",
+   "variants": [
+    "ulcer"
+   ]
+  },
+  "vajan badhna": {
+   "tier": "minor",
+   "variants": [
+    "vajan badhna"
+   ]
+  },
+  "vajan ghatna": {
+   "tier": "minor",
+   "variants": [
+    "vajan ghatna"
+   ]
+  },
+  "vesicle": {
+   "tier": "minor",
+   "variants": [
+    "vesicle"
+   ]
+  },
+  "weight gain": {
+   "tier": "minor",
+   "variants": [
+    "weight gain"
+   ]
+  },
+  "weight loss": {
+   "tier": "minor",
+   "variants": [
+    "weight loss"
+   ]
+  },
+  "wheal": {
+   "tier": "minor",
+   "variants": [
+    "wheal"
+   ]
+  },
+  "yaadast kamjor": {
+   "tier": "minor",
+   "variants": [
+    "yaadast kamjor"
+   ]
+  },
+  "yellowish skin": {
+   "tier": "minor",
+   "variants": [
+    "yellowish skin"
+   ]
+  }
+ }
+}
