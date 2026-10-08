@@ -258,7 +258,49 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     }
 
     final triageProvider = Provider.of<TriageProvider>(context, listen: false);
+    
+    // NEW ARCHITECTURE: Send Voice Keywords to ESP32
+    final keywords = KeywordExtractor.extractSymptoms(triageProvider.patientTranscript);
+    if (keywords.isNotEmpty) {
+      final csv = keywords.join(',');
+      await BleService().sendCommand("VOICE_KW:$csv\n");
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    
+    // Request Triage from ESP32 -> Pi -> ESP32 -> Phone
+    await BleService().sendCommand("SEND_TRIAGE\n");
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+    
+    // Poll for the result to come back over BLE
+    for (int i = 0; i < 30; i++) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (triageProvider.piTriageResult != null) {
+        break;
+      }
+    }
+    
+    if (!context.mounted) return;
+    Navigator.of(context).pop(); // Dismiss loading
+
+    if (triageProvider.piTriageResult == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Triage timed out. ESP32/Pi did not respond.')),
+      );
+      return;
+    }
+
     final payload = triageProvider.generateJsonPayload();
+    
+    // Overwrite local evaluation with Pi's evaluation
+    payload['triage']['triage'] = triageProvider.serverTriageSignal ?? payload['triage']['triage'];
+    payload['triage']['symptoms'] = triageProvider.serverSymptoms;
+    payload['triage']['confidence'] = triageProvider.piTriageResult?['confidence_score'] ?? payload['triage']['confidence'];
+
     final VitalsModel result = VitalsModel.fromJson(payload);
     
     // MEWS SAFETY OVERRIDE

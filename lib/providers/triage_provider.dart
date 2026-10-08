@@ -192,6 +192,14 @@ class TriageProvider extends ChangeNotifier {
   String _patientTranscript = "";
   String get patientTranscript => _patientTranscript;
 
+  List<String> _serverSymptoms = [];
+  String? _serverTriageSignal;
+  Map<String, dynamic>? _piTriageResult;
+
+  List<String> get serverSymptoms => _serverSymptoms;
+  String? get serverTriageSignal => _serverTriageSignal;
+  Map<String, dynamic>? get piTriageResult => _piTriageResult;
+
   void setPatientTranscript(String transcript) {
     _patientTranscript = transcript;
     notifyListeners();
@@ -365,6 +373,12 @@ class TriageProvider extends ChangeNotifier {
           if (rawRgbList != null && rawRgbList.length >= 3) {
             _runUrineInference(rawRgbList);
           }
+          break;
+        case 'TRIAGE':
+        case 'TRIAGE_RESULT':
+          _piTriageResult = data;
+          _serverTriageSignal = data['triage_color']?.toString().toUpperCase();
+          _serverSymptoms = (data['symptom_list'] as List?)?.map((e) => e.toString()).toList() ?? [];
           break;
       }
       notifyListeners();

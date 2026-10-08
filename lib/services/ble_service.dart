@@ -31,9 +31,9 @@ class BleService {
 
   // Custom Constants
   static const String targetDeviceName = "ESP32_VitalsRig_01";
-  static final Guid serviceUuid = Guid("6fa41660-6244-4aa0-aee4-06d9377ad51b");
-  static final Guid rxCharUuid = Guid("bf9dace6-017f-4793-abf9-5d117db16e55");
-  static final Guid txCharUuid = Guid("41d5a28d-de2a-4ab4-aa6e-31ab8472925c");
+  static final Guid serviceUuid = Guid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
+  static final Guid rxCharUuid = Guid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
+  static final Guid txCharUuid = Guid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
 
   // Chunking Buffer State
   final Map<int, List<int>> _chunkBuffer = {};

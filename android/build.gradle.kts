@@ -48,10 +48,29 @@ subprojects {
         }
     }
 
+    tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+        enabled = false
+    }
+
     val configureAndroid: () -> Unit = {
         if (plugins.hasPlugin("com.android.application") || plugins.hasPlugin("com.android.library")) {
             val androidExt = extensions.findByName("android")
             if (androidExt != null) {
+                if (proj.name != "app") {
+                    try {
+                        val compileSdkVersionMethod = androidExt.javaClass.methods.firstOrNull {
+                            it.name == "compileSdkVersion" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType
+                        }
+                        compileSdkVersionMethod?.invoke(androidExt, 34)
+                    } catch (_: Throwable) {}
+                    try {
+                        val setCompileSdkMethod = androidExt.javaClass.methods.firstOrNull {
+                            it.name == "setCompileSdk" && it.parameterTypes.size == 1
+                        }
+                        setCompileSdkMethod?.invoke(androidExt, 34)
+                    } catch (_: Throwable) {}
+                }
+
                 try {
                     val getNamespace = androidExt.javaClass.getMethod("getNamespace")
                     val currentNs = getNamespace.invoke(androidExt) as? String
