@@ -222,7 +222,7 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
   String _getCommandForType(VitalTestType type) {
     switch (type) {
       case VitalTestType.spo2: return 'REQ_SPO2';
-      case VitalTestType.hr: return 'REQ_SPO2';
+      case VitalTestType.hr: return 'REQ_ECG';
       case VitalTestType.temp: return 'REQ_TEMP';
       case VitalTestType.urine: return 'REQ_URINE';
       case VitalTestType.stethoscope: return 'REQ_STETH';
