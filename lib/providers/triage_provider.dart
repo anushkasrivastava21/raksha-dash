@@ -205,14 +205,6 @@ class TriageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Server-verified symptoms returned by Anirudh's /predict ML engine.
-  /// These are merged with on-device KeywordExtractor results at triage time.
-  List<String> _serverSymptoms = [];
-
-  /// Optional triage color signal from the backend ML engine ("GREEN"/"YELLOW"/"RED").
-  /// Used as an upgrade signal only — MEWS and XGBoost RED always win.
-  String? _serverTriageSignal;
-
   /// Called when the backend /predict endpoint returns symptoms.
   /// Merges with local keyword extractor results at triage generation time.
   void setServerSymptoms(List<String> symptoms, {String? triageColor}) {
