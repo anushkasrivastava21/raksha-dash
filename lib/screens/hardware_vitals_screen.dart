@@ -42,6 +42,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   static const Color _completedGreen = Color(0xFF34A853);
 
   // Removed _rawBleData
+  bool _isConnecting = false;
 
   // Speech integration state
   StreamSubscription<String>? _speechSubscription;
