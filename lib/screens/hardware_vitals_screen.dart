@@ -41,8 +41,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   static const Color _completedBg = Color(0xFFDFF5E1);
   static const Color _completedGreen = Color(0xFF34A853);
 
-  String _rawBleData = "";
-  bool _isConnecting = false;
+  // Removed _rawBleData
 
   // Speech integration state
   StreamSubscription<String>? _speechSubscription;
@@ -109,9 +108,6 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     super.initState();
     _bleSubscription = BleService().rawDataStream.listen((data) {
       if (mounted) {
-        setState(() {
-          _rawBleData = data;
-        });
 
         // The exact break in the pipeline: Parse telemetry and update UI state!
         try {
