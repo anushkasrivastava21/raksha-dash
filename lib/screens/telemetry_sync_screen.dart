@@ -171,7 +171,8 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
               // Remove this once the replacement sensor is wired.
               triageProvider.updateFromBleJson('TEMP', '{"body_temp_c": 37.0}');
             } else {
-              triageProvider.updateFromBleJson(sensorCode, jsonPayload);
+              final String? targetTest = widget.testType == VitalTestType.hr ? 'hr' : null;
+              triageProvider.updateFromBleJson(sensorCode, jsonPayload, targetTest: targetTest);
             }
             
             final triageState = Provider.of<TriageState>(context, listen: false);

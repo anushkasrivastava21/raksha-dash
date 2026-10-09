@@ -309,19 +309,29 @@ class TriageProvider extends ChangeNotifier {
   }
 
   // Parses incoming BLE JSON and updates state directly
-  void updateFromBleJson(String sensorCode, String jsonPayload) {
+  void updateFromBleJson(String sensorCode, String jsonPayload, {String? targetTest}) {
     try {
       final Map<String, dynamic> data = jsonDecode(jsonPayload);
       
       switch (sensorCode) {
         case 'SPO2':
         case 'MAX30102':
-          _spo2TempResult = Spo2TempResult(
-            spo2: (data['spo2_percent'] ?? 98).toInt(),
-            temperature: _spo2TempResult?.temperature ?? 36.5,
-            heartRate: (data['heart_rate_bpm'] ?? 72).toInt(),
-          );
-          _spo2TempStatus = ScanStatus.clean;
+          if (targetTest == 'hr') {
+            _ecgResult = EcgResult(
+              heartRate: (data['heart_rate_bpm'] ?? 72).toDouble(),
+              rhythm: 'Normal Sinus',
+              qtInterval: 400.0,
+              rawSamples: [],
+            );
+            _ecgStatus = ScanStatus.clean;
+          } else {
+            _spo2TempResult = Spo2TempResult(
+              spo2: (data['spo2_percent'] ?? 98).toInt(),
+              temperature: _spo2TempResult?.temperature ?? 36.5,
+              heartRate: (data['heart_rate_bpm'] ?? 72).toInt(),
+            );
+            _spo2TempStatus = ScanStatus.clean;
+          }
           break;
         case 'TEMP':
         case 'MLX90614':
