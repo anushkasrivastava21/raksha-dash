@@ -665,14 +665,17 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                 ),
                 Expanded(
                   child: Center(
-                    child: Text(
-                      isCompleted ? (reading ?? 'DONE') : title,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Space Mono',
-                        fontSize: isCompleted ? 18 : 28,
-                        fontWeight: FontWeight.w700,
-                        color: isCompleted ? _completedGreen : _onSurface,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        isCompleted ? (reading ?? 'DONE') : title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Space Mono',
+                          fontSize: isCompleted ? 18 : 28,
+                          fontWeight: FontWeight.w700,
+                          color: isCompleted ? _completedGreen : _onSurface,
+                        ),
                       ),
                     ),
                   ),

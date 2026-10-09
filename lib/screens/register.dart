@@ -315,6 +315,7 @@ class _RakshaPatientRegistrationScreenState
                 color: outlineGray,
                 size: 22,
               ),
+              isExpanded: true,
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
