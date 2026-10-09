@@ -180,10 +180,15 @@ class InferenceService {
     }
 
     try {
-      // Input shape: (1, 3) — normalised [R, G, B]
-      final r = rgb[0].clamp(0.0, 255.0);
-      final g = rgb[1].clamp(0.0, 255.0);
-      final b = rgb[2].clamp(0.0, 255.0);
+      // Dynamic Relative Scaling (Chromaticity Normalization)
+      // Converts raw sensor frequencies (thousands) to standard 0-255 RGB
+      // by finding the highest frequency and scaling the others proportionally.
+      final double maxVal = [rgb[0], rgb[1], rgb[2]].reduce((a, b) => a > b ? a : b);
+      final double scale = maxVal > 0 ? (255.0 / maxVal) : 0.0;
+      
+      final r = (rgb[0] * scale).clamp(0.0, 255.0);
+      final g = (rgb[1] * scale).clamp(0.0, 255.0);
+      final b = (rgb[2] * scale).clamp(0.0, 255.0);
 
       final input = [
         [r, g, b]
