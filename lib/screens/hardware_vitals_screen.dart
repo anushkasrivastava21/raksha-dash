@@ -606,30 +606,6 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                             ),
                           ),
 
-                          // Raw bytes display (PRD requirement)
-                          if (_rawBleData.isNotEmpty)
-                            Expanded(
-                              flex: 1,
-                              child: Container(
-                                margin: const EdgeInsets.only(top: 12),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                width: double.infinity,
-                                child: SingleChildScrollView(
-                                  child: Text(
-                                    'RAW BLE BYTES:\n$_rawBleData',
-                                    style: const TextStyle(
-                                      fontFamily: 'Space Mono',
-                                      color: Colors.greenAccent,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
 
                           // MIC / VOICE SECTION
                           const SizedBox(height: 10),
