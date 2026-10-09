@@ -76,12 +76,8 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
             switch (sensorCode) {
               case 'SPO2':
               case 'MAX30102':
-                if (parsed.containsKey('spo2_percent')) {
-                  triageState.markCompleted(VitalTestType.spo2, reading: "${parsed['spo2_percent']}%");
-                }
-                if (parsed.containsKey('heart_rate_bpm')) {
-                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['heart_rate_bpm']} BPM");
-                }
+                // Removed passive auto-complete logic here.
+                // It is now precisely handled by telemetry_sync_screen.dart to ensure SpO2 and ECG stay separate.
                 break;
               case 'TEMP':
               case 'MLX90614':
@@ -96,9 +92,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                 break;
               case 'ECG':
               case 'HR':
-                if (parsed.containsKey('heart_rate_bpm')) {
-                  triageState.markCompleted(VitalTestType.hr, reading: "${parsed['heart_rate_bpm']} BPM");
-                }
+                // Auto-complete handled in telemetry_sync_screen.dart
                 break;
               case 'STETH':
                 if (parsed.containsKey('rms')) {

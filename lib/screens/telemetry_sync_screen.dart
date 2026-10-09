@@ -155,7 +155,22 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
             triageProvider.updateFromBleJson(sensorCode, jsonPayload);
             
             final triageState = Provider.of<TriageState>(context, listen: false);
-            triageState.markCompleted(widget.testType);
+            
+            final Map<String, dynamic> parsed = jsonDecode(jsonPayload);
+            String? readingLabel;
+            if (widget.testType == VitalTestType.spo2 && parsed.containsKey('spo2_percent')) {
+              readingLabel = "${parsed['spo2_percent']}%";
+            } else if (widget.testType == VitalTestType.hr && parsed.containsKey('heart_rate_bpm')) {
+              readingLabel = "${parsed['heart_rate_bpm']} BPM";
+            } else if (widget.testType == VitalTestType.temp && parsed.containsKey('body_temp_c')) {
+              readingLabel = "${parsed['body_temp_c']}°C";
+            } else if (widget.testType == VitalTestType.urine && parsed.containsKey('red')) {
+              readingLabel = "RGB(${parsed['red']}, ${parsed['green']}, ${parsed['blue']})";
+            } else if (widget.testType == VitalTestType.stethoscope && parsed.containsKey('rms')) {
+              readingLabel = "RMS: ${parsed['rms']}";
+            }
+
+            triageState.markCompleted(widget.testType, reading: readingLabel);
 
             Navigator.pushReplacement(
               context,
@@ -177,7 +192,7 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
   bool _isExpectedCode(String code, VitalTestType type) {
     switch (type) {
       case VitalTestType.spo2: return code == 'SPO2' || code == 'MAX30102';
-      case VitalTestType.hr: return code == 'HR' || code == 'ECG';
+      case VitalTestType.hr: return code == 'SPO2' || code == 'HR' || code == 'ECG';
       case VitalTestType.temp: return code == 'TEMP' || code == 'MLX90614';
       case VitalTestType.urine: return code == 'URINE';
       case VitalTestType.stethoscope:
@@ -189,7 +204,7 @@ class _DynamicTestLoaderScreenState extends State<DynamicTestLoaderScreen>
   String _getCommandForType(VitalTestType type) {
     switch (type) {
       case VitalTestType.spo2: return 'REQ_SPO2';
-      case VitalTestType.hr: return 'REQ_ECG';
+      case VitalTestType.hr: return 'REQ_SPO2';
       case VitalTestType.temp: return 'REQ_TEMP';
       case VitalTestType.urine: return 'REQ_URINE';
       case VitalTestType.stethoscope: return 'REQ_STETH';

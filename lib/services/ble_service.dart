@@ -30,7 +30,7 @@ class BleService {
   bool get isConnected => _device != null && _device!.isConnected;
 
   // Custom Constants
-  static const String targetDeviceName = "ESP32_VitalsRig_01";
+  static const String targetDeviceName = "RAKSHA_ESP32";
   static final Guid serviceUuid = Guid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
   static final Guid rxCharUuid = Guid("6E400002-B5A3-F393-E0A9-E50E24DCCA9E");
   static final Guid txCharUuid = Guid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -136,7 +136,6 @@ class BleService {
       });
 
       await FlutterBluePlus.startScan(
-        withServices: [serviceUuid], 
         timeout: const Duration(seconds: 15)
       );
 
@@ -183,46 +182,21 @@ class BleService {
   Future<void> _subscribeToTxCharacteristic() async {
     if (_txCharacteristic == null) return;
     
-    // [FIX]: Subscribe to the stream BEFORE enabling notifications on the hardware.
-    // ESP32 might blast data the millisecond CCCD 0x2902 is set to 1.
+    // ESP32 sends raw ASCII strings ending in '\n'. We must accumulate bytes until we see '\n'.
     _notifySub = _txCharacteristic!.onValueReceived.listen((rawBytes) {
       if (rawBytes.isEmpty) return;
       
-      // ── Step 1: Parse the chunk header byte ──
-      final headerByte = rawBytes[0];
-      final totalChunks = (headerByte >> 4) & 0x0F;
-      final chunkIndex  = headerByte & 0x0F;
-
-      if (totalChunks == 0) return; // Invalid header
-      
-      // ── Step 2: Store chunk payload (bytes after header) ──
-      if (_expectedChunks == 0 || _expectedChunks != totalChunks || chunkIndex == 0) {
-        _chunkBuffer.clear();
-        _expectedChunks = totalChunks;
-      }
-      
-      _chunkBuffer[chunkIndex] = rawBytes.sublist(1);
-      
-      // ── Step 3: Check if all chunks received ──
-      if (_chunkBuffer.length < totalChunks) return;
-      
-      // ── Step 4: Reassemble in order ──
-      List<int> fullPayload = [];
-      for (int i = 0; i < totalChunks; i++) {
-        if (_chunkBuffer.containsKey(i)) {
-          fullPayload.addAll(_chunkBuffer[i]!);
+      for (int b in rawBytes) {
+        if (b == 10) { // '\n'
+          if (_chunkBuffer.containsKey(0)) {
+            final completePayload = List<int>.from(_chunkBuffer[0]!);
+            _chunkBuffer.clear();
+            _processReassembledPayload(completePayload);
+          }
         } else {
-          debugPrint('Missing chunk index $i, dropping packet.');
-          _chunkBuffer.clear();
-          _expectedChunks = 0;
-          return;
+          _chunkBuffer.putIfAbsent(0, () => []).add(b);
         }
       }
-      
-      _chunkBuffer.clear();
-      _expectedChunks = 0;
-      
-      _processReassembledPayload(fullPayload);
     });
 
     if (_txCharacteristic!.properties.notify) {
