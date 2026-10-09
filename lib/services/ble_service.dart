@@ -37,7 +37,6 @@ class BleService {
 
   // Chunking Buffer State
   final Map<int, List<int>> _chunkBuffer = {};
-  int _expectedChunks = 0;
 
   Future<bool> connectToEsp32() async {
     if (_isConnecting) return false;
@@ -282,7 +281,6 @@ class BleService {
     _rxCharacteristic = null;
     _txCharacteristic = null;
     _chunkBuffer.clear();
-    _expectedChunks = 0;
     _device = null;
   }
 

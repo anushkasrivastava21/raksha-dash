@@ -41,7 +41,7 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
   static const Color _completedBg = Color(0xFFDFF5E1);
   static const Color _completedGreen = Color(0xFF34A853);
 
-  String _rawBleData = "";
+  // Removed _rawBleData
   bool _isConnecting = false;
 
   // Speech integration state
@@ -109,9 +109,6 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
     super.initState();
     _bleSubscription = BleService().rawDataStream.listen((data) {
       if (mounted) {
-        setState(() {
-          _rawBleData = data;
-        });
 
         // The exact break in the pipeline: Parse telemetry and update UI state!
         try {
@@ -355,39 +352,27 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
       await Future.delayed(const Duration(milliseconds: 500));
     }
     
-    // Request Triage from ESP32 -> Pi -> ESP32 -> Phone
-    await BleService().sendCommand("SEND_TRIAGE\n");
+    // ── PHONE-ONLY MODE: Bypassing Pi/ESP32 Triage Request ──
+    // The user requested to work on the phone only, so we skip sending
+    // "SEND_TRIAGE" to the ESP32 and waiting 15 seconds for a response.
     
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-    
-    // Poll for the result to come back over BLE
-    for (int i = 0; i < 30; i++) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (triageProvider.piTriageResult != null) {
-        break;
-      }
-    }
-    
-    if (!context.mounted) return;
-    Navigator.of(context).pop(); // Dismiss loading
-
-    if (triageProvider.piTriageResult == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Triage timed out. ESP32/Pi did not respond.')),
-      );
-      return;
-    }
+    // showDialog(
+    //   context: context,
+    //   barrierDismissible: false,
+    //   builder: (context) => const Center(child: CircularProgressIndicator()),
+    // );
+    // Navigator.of(context).pop(); // Dismiss loading
 
     final payload = triageProvider.generateJsonPayload();
     
-    // Overwrite local evaluation with Pi's evaluation
-    payload['triage']['triage'] = triageProvider.serverTriageSignal ?? payload['triage']['triage'];
-    payload['triage']['symptoms'] = triageProvider.serverSymptoms;
-    payload['triage']['confidence'] = triageProvider.piTriageResult?['confidence_score'] ?? payload['triage']['confidence'];
+    // Overwrite local evaluation with Pi's evaluation only if available
+    if (triageProvider.piTriageResult != null) {
+      payload['triage']['triage'] = triageProvider.serverTriageSignal ?? payload['triage']['triage'];
+      if (triageProvider.serverSymptoms.isNotEmpty) {
+        payload['triage']['symptoms'] = triageProvider.serverSymptoms;
+      }
+      payload['triage']['confidence'] = triageProvider.piTriageResult?['confidence_score'] ?? payload['triage']['confidence'];
+    }
 
     final VitalsModel result = VitalsModel.fromJson(payload);
     
@@ -606,30 +591,6 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
                             ),
                           ),
 
-                          // Raw bytes display (PRD requirement)
-                          if (_rawBleData.isNotEmpty)
-                            Expanded(
-                              flex: 1,
-                              child: Container(
-                                margin: const EdgeInsets.only(top: 12),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                width: double.infinity,
-                                child: SingleChildScrollView(
-                                  child: Text(
-                                    'RAW BLE BYTES:\n$_rawBleData',
-                                    style: const TextStyle(
-                                      fontFamily: 'Space Mono',
-                                      color: Colors.greenAccent,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
 
                           // MIC / VOICE SECTION
                           const SizedBox(height: 10),
