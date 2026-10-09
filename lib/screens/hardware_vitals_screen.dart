@@ -377,17 +377,21 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
 
     if (triageProvider.piTriageResult == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Triage timed out. ESP32/Pi did not respond.')),
+        const SnackBar(content: Text('Pi unreachable. Falling back to local on-device ML triage.')),
       );
-      return;
+      // Fallback to local triage; do not return!
     }
 
     final payload = triageProvider.generateJsonPayload();
     
-    // Overwrite local evaluation with Pi's evaluation
-    payload['triage']['triage'] = triageProvider.serverTriageSignal ?? payload['triage']['triage'];
-    payload['triage']['symptoms'] = triageProvider.serverSymptoms;
-    payload['triage']['confidence'] = triageProvider.piTriageResult?['confidence_score'] ?? payload['triage']['confidence'];
+    // Overwrite local evaluation with Pi's evaluation only if available
+    if (triageProvider.piTriageResult != null) {
+      payload['triage']['triage'] = triageProvider.serverTriageSignal ?? payload['triage']['triage'];
+      if (triageProvider.serverSymptoms.isNotEmpty) {
+        payload['triage']['symptoms'] = triageProvider.serverSymptoms;
+      }
+      payload['triage']['confidence'] = triageProvider.piTriageResult?['confidence_score'] ?? payload['triage']['confidence'];
+    }
 
     final VitalsModel result = VitalsModel.fromJson(payload);
     
