@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/triage_provider.dart';
+import '../providers/triage_state.dart';
 import '../widgets/app_header.dart';
 import 'register.dart';
 
@@ -128,10 +131,17 @@ class RakshaTriageHomeScreen extends StatelessWidget {
           if (onStartCheck != null) {
             onStartCheck!();
           } else {
+            // Strictly reset all global state before initiating a new patient flow
+            Provider.of<TriageState>(context, listen: false).reset();
+            Provider.of<TriageProvider>(context, listen: false).resetAll();
+
+            final String dynamicId = 'PT-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const RakshaPatientRegistrationScreen(),
+                builder: (context) => RakshaPatientRegistrationScreen(
+                  patientId: dynamicId,
+                ),
               ),
             );
           }

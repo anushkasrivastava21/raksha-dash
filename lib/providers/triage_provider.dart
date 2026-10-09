@@ -205,6 +205,23 @@ class TriageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Server-verified symptoms returned by Anirudh's /predict ML engine.
+  /// These are merged with on-device KeywordExtractor results at triage time.
+  List<String> _serverSymptoms = [];
+
+  /// Optional triage color signal from the backend ML engine ("GREEN"/"YELLOW"/"RED").
+  /// Used as an upgrade signal only — MEWS and XGBoost RED always win.
+  String? _serverTriageSignal;
+
+  /// Called when the backend /predict endpoint returns symptoms.
+  /// Merges with local keyword extractor results at triage generation time.
+  void setServerSymptoms(List<String> symptoms, {String? triageColor}) {
+    _serverSymptoms = symptoms;
+    _serverTriageSignal = triageColor?.toUpperCase();
+    debugPrint('☁️ [TriageProvider] Server symptoms ingested: $_serverSymptoms (signal: $_serverTriageSignal)');
+    notifyListeners();
+  }
+
   // ════════════════════════════════════════════════════════════════════════
   // HARDWARE DATA APPLIERS (Direct Hardware Telemetry Ingestion)
   // ════════════════════════════════════════════════════════════════════════
@@ -509,32 +526,53 @@ class TriageProvider extends ChangeNotifier {
       temperature: (_spo2TempResult?.temperature ?? 36.8).toDouble(),
     ));
 
-    // Compute ML-based triage from XGBoost rule table
-    // Merge ECG-derived arrhythmia keyword with any STT-extracted symptoms.
+    // ── SYMPTOM KEYWORDS ─────────────────────────────────────────────────
+    // Merge on-device KeywordExtractor results with server-verified symptoms
+    // from Anirudh's /predict ML engine. Deduplicated via Set.
+    final Set<String> mergedSymptoms = {
+      ...KeywordExtractor.extractSymptoms(_patientTranscript),
+      ...ecgDerivedKeywords,  // Injects arrhythmia signal into rule table
+      ..._serverSymptoms,     // ☁️ Server-verified symptoms (now wired in)
+    };
+    final List<String> symptomKeywords = mergedSymptoms.toList();
+
     final triageInputs = TriageInputs(
       ecgHr: (_ecgResult?.heartRate ?? _stethResult?.heartRate)?.toDouble(),
       spo2: _spo2TempResult?.spo2.toDouble(),
       temperature: _spo2TempResult?.temperature,
       urineSeverity: liveUrineSeverity,
-      symptomKeywords: [
-        ...KeywordExtractor.extractSymptoms(_patientTranscript),
-        ...ecgDerivedKeywords,  // Injects arrhythmia signal into rule table
-      ],
+      symptomKeywords: symptomKeywords,
     );
     final mlTriage = evaluateTriage(triageInputs);
 
-    // MEWS RED/YELLOW always wins and overrides the ML base signal —
-    // this is Finding 2 from the PRD: the override must be the only thing that
-    // reaches the cloud/dashboard when it fires.
-    final String triageColor = mews.override ? mews.displayColor! : mlTriage.triageColor;
-    final double confidence = mews.override ? 0.99 : mlTriage.confidence;
+    // MEWS RED/YELLOW always wins and overrides the ML base signal.
+    // If MEWS is clear, apply server triage signal as an upgrade:
+    //   - Server says RED/YELLOW + local XGBoost says GREEN → upgrade to YELLOW
+    //   - Server signal never downgrades a local RED/YELLOW result.
+    String triageColor;
+    double confidence;
+    if (mews.override) {
+      triageColor = mews.displayColor!;
+      confidence = 0.99;
+    } else {
+      triageColor = mlTriage.triageColor;
+      confidence = mlTriage.confidence;
+      // Apply server signal as a soft upgrade
+      if (_serverTriageSignal != null &&
+          (_serverTriageSignal == 'RED' || _serverTriageSignal == 'YELLOW') &&
+          triageColor == 'GREEN') {
+        debugPrint('☁️ [TriageProvider] Server signal ($_serverTriageSignal) upgrading GREEN → YELLOW');
+        triageColor = 'YELLOW';
+        confidence = 0.80; // Lower confidence signals rule-based upgrade, not hard inference
+      }
+    }
 
     return {
       "patient_id": activeId,
       "timestamp": DateTime.now().toIso8601String(),
       "triage": triageColor,
       "confidence": confidence,
-      "symptoms": triageInputs.symptomKeywords,
+      "symptoms": symptomKeywords,
     };
   }
 
@@ -668,6 +706,10 @@ class TriageProvider extends ChangeNotifier {
     _spo2TempResult = null;
     _urineResult = null;
     _patientTranscript = "";
+    _serverSymptoms = [];
+    _serverTriageSignal = null;
+    _isEcgAbnormal = false;
+    _urineInferenceSeverity = null;
 
     if (pageController.hasClients) {
       pageController.jumpToPage(0);
