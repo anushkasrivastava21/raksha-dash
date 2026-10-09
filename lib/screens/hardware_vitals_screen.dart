@@ -355,32 +355,16 @@ class _RakshaHardwareVitalsScreenState extends State<RakshaHardwareVitalsScreen>
       await Future.delayed(const Duration(milliseconds: 500));
     }
     
-    // Request Triage from ESP32 -> Pi -> ESP32 -> Phone
-    await BleService().sendCommand("SEND_TRIAGE\n");
+    // ── PHONE-ONLY MODE: Bypassing Pi/ESP32 Triage Request ──
+    // The user requested to work on the phone only, so we skip sending
+    // "SEND_TRIAGE" to the ESP32 and waiting 15 seconds for a response.
     
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-    
-    // Poll for the result to come back over BLE
-    for (int i = 0; i < 30; i++) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (triageProvider.piTriageResult != null) {
-        break;
-      }
-    }
-    
-    if (!context.mounted) return;
-    Navigator.of(context).pop(); // Dismiss loading
-
-    if (triageProvider.piTriageResult == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pi unreachable. Falling back to local on-device ML triage.')),
-      );
-      // Fallback to local triage; do not return!
-    }
+    // showDialog(
+    //   context: context,
+    //   barrierDismissible: false,
+    //   builder: (context) => const Center(child: CircularProgressIndicator()),
+    // );
+    // Navigator.of(context).pop(); // Dismiss loading
 
     final payload = triageProvider.generateJsonPayload();
     
