@@ -68,6 +68,64 @@ graph TD
     J -->|Network Restored| K[(Cloud Backend)]
 ```
 
+## Architecture v2.0 (ESP32-Hub)
+
+```
+Phone App (Flutter)
+   │
+   │  Step 1 — User taps a sensor card
+   │  BLE Write → "REQ_TEMP" / "REQ_ECG" / "REQ_SPO2" / "REQ_URINE" / "REQ_STETH"
+   ▼
+ESP32
+   │  Step 2 — ESP32 activates the sensor
+   │  Step 3 — Sensor records reading, reports back to ESP32
+   │  Step 4 — ESP32 sends framed packet back over BLE
+   │  BLE Notify → "TEMP|{body_temp_c:36.7}|CRC"
+   ▼
+Phone App
+   │  (User sees reading displayed on the card)
+   │  (Repeat Steps 1–4 for all 5 sensors)
+   │
+   │  Step 5 — User speaks into phone mic
+   │  Step 6 — On-device Vosk runs → produces transcript/keywords
+   │  Step 7 — Phone sends voice keywords directly to ESP32 over BLE
+   │  BLE Write → "VOICE_KW:fever,chest pain,dizzy"
+   ▼
+ESP32
+   │  Step 8 — ESP32 stores voice keywords (already has all 5 sensor readings)
+   │  Step 9 — ESP32 assembles full JSON packet (sensors + voice)
+   │  WiFi HTTP POST → http://<PI_IP>:8000/run_triage
+   ▼
+Raspberry Pi
+   │  Step 10 — Pi receives full packet, runs XGBoost AI triage model
+   │  Step 11 — Pi sends result back as HTTP response to ESP32
+   │  HTTP 200 → {"triage":"Red","confidence":0.87,"symptoms":["fever"]}
+   ▼
+ESP32
+   │  Step 12 — ESP32 forwards result to Phone over BLE
+   │  BLE Notify → "TRIAGE|{triage:Red,...}|CRC"
+   ▼
+Phone App
+   (Displays triage result screen)
+```
+
+### Pi API Endpoints
+| Method | Endpoint | Called By | Description |
+|---|---|---|---|
+| GET | `/` | Anyone | Health check |
+| POST | `/run_triage` | ESP32 (WiFi) | Full vitals → returns AI triage |
+| GET | `/ping` | Debugging | Pi alive check |
+
+### BLE UUIDs
+- **Service:** `6E400001-B5A3-F393-E0A9-E50E24DCCA9E`
+- **RX Char (phone writes):** `6E400002-B5A3-F393-E0A9-E50E24DCCA9E`
+- **TX Char (ESP32 notifies):** `6E400003-B5A3-F393-E0A9-E50E24DCCA9E`
+
+### Pi Setup
+```bash
+cd raspi_port && ./setup_pi.sh && ./start_pi.sh
+```
+
 ## Tech Stack & ML Models
 - **Frontend & Orchestration:** Flutter / Dart (Cross-platform)
 - **Edge Inference Engine:** TensorFlow Lite (TFLite)
