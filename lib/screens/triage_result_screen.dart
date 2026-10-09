@@ -561,18 +561,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
               ),
             ],
           ),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: Container(
-              width: 10.0,
-              height: 10.0,
-              decoration: BoxDecoration(
-                color: borderColor,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
+          // Removed the Positioned red dot per user request
         ],
       ),
     );
